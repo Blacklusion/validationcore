@@ -9,13 +9,10 @@ import * as stream from "stream";
 import fetch = require("node-fetch");
 import { logger } from "../common";
 import { getConnection } from "typeorm";
-import { copyFileSync } from "fs";
-import { Api } from "../database/entity/Api";
 import { Seed } from "../database/entity/Seed";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
-import { evaluateMessage, sendMessageOrganization, sendMessageSeed } from "../telegramHandler";
-import { Organization } from "../database/entity/Organization";
+import { evaluateMessage, sendMessageSeed } from "../telegramHandler";
 
 /**
  * Logger Settings for Organization

@@ -1,12 +1,11 @@
 import * as HttpRequest from "../httpConnection/HttpRequest";
 import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
-import { Api } from "../database/entity/Api";
 import * as config from "config";
 import { Logger } from "tslog";
 import { History } from "../database/entity/History";
 import { getConnection } from "typeorm";
-import { evaluateMessage, sendMessageApi, sendMessageHistory } from "../telegramHandler";
+import { evaluateMessage, sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 
 /**

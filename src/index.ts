@@ -3,12 +3,9 @@ import * as HttpRequest from "./httpConnection/HttpRequest";
 import { validateAll } from "./validation/validate-organization";
 import { Guild } from "./database/entity/Guild";
 import { logger } from "./common";
-import { Organization } from "./database/entity/Organization";
 import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
-import { error, log } from "util";
-import { sendMessageApi } from "./telegramHandler";
 
 async function validateGuild(guildName: string) {
   const database = getConnection();

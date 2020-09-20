@@ -23,7 +23,10 @@
     "reflect-metadata": "^0.1.10",
     "toml": "^3.0.0",
     "tslog": "^2.8.0",
-    "typeorm": "0.2.25"
+    "typeorm": "0.2.25",
+    "eosjs": "^21.0.3",
+    "node-fetch": "^2.6.1",
+    "stream": "^0.0.2"
   },
   "keywords": [
     "blacklusion pager",

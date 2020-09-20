@@ -7,9 +7,7 @@ import { Guild } from "../database/entity/Guild";
 import { Api } from "../database/entity/Api";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
-import { Organization } from "../database/entity/Organization";
-import { evaluateMessage, sendMessageApi, sendMessageOrganization } from "../telegramHandler";
-import { createDiffieHellman } from "crypto";
+import { evaluateMessage, sendMessageApi } from "../telegramHandler";
 
 /**
  * Logger Settings for Api
