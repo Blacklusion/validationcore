@@ -16,7 +16,11 @@ export async function get(
   path = "",
   retryCounter: number = config.get("validation.request_retry_count")
 ): Promise<HttpResponse> {
-  url = concatUrl(url, path);
+  // todo: implement no url provided and invalid url error
+  if (!url) {
+    throw new HttpError(1, 0, "No url was provided");
+  }
+  url = new URL(path, url).toString();
 
   try {
     const response: axios.AxiosResponse = await axios.default({
@@ -62,7 +66,12 @@ export async function post(
   retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
 ): Promise<HttpResponse> {
-  url = concatUrl(url, path);
+
+  // todo: implement no url provided and invalid url error
+  if (!url) {
+    throw new HttpError(1, 0, "No url was provided");
+  }
+  url = new URL(path, url).toString();
 
   try {
     const response: axios.AxiosResponse = await axios.default({
@@ -92,43 +101,6 @@ export async function post(
       throw httpError;
     }
   }
-}
-
-/**
- * Eliminates a possible double dash ('//') during concatenation of the url and path
- * e.g. "example.com/" + "/help" -> "example.com//help" will be corrected to "example.com/help"
- * @param url
- * @param path
- */
-function concatUrl(url: string, path: string): string {
-  // todo: test method
-  // todo: test if url is valid
-  if (!url) {
-    throw new HttpError(1, 0, "No url was provided");
-  }
-
-  try {
-    if (path.length > 0) {
-      if (url.charAt(url.length - 1) === "/" && url.length > 0) {
-        url = url.substr(0, url.length - 1);
-      }
-      if (path.charAt(0) === "/" && path.length > 0) {
-        path = path.substring(1, path.length);
-      }
-      return url + "/" + path;
-    } else {
-      return url;
-    }
-  } catch (error) {
-    logger.fatal("Error during concatUrl() url. Check implementation of method!", error);
-    return "";
-  }
-
-  // todo: regex matching
-  // todo: add support for generic url (e.g. google.de, example.de)
-  // todo: localhost, 127....
-  // validator: #^https?://[a-z-0-9A-Z.-/]+[a-z-0-9A-Z.-_%]*$#
-  // new RegExp("https?:\/\/[A-Z|a-z|0-9]+([\.|-]?[A-Z|a-z|0-9]+\/?)*").test(url);
 }
 
 /**
