@@ -1,5 +1,4 @@
 import * as config from "config";
-import * as HttpRequest from "./httpConnection/HttpRequest";
 import { validateAll } from "./validation/validate-organization";
 import { Guild } from "./database/entity/Guild";
 import { logger } from "./common";
@@ -95,18 +94,22 @@ async function updateGuildTable(isMainnet: boolean) {
     let results = await rpc.get_producers(true, "", config.get("validation.producer_limit"));
     results = { ...results.rows };
 
-    let counter = 0;
+    // Update guild information one by one
+    // todo: guard-for-in
     for (const i in results) {
       const producer = results[i];
 
       // Pursue only if guild is not a dummy guild
       if (producer && producer.is_active == 1 && producer.url && producer.owner) {
-        counter++;
         const guild = new Guild();
         guild.name = producer.owner;
 
+        // Get guild from database if it is already tracked
         const guildFromDatabase = await database.manager.findOne(Guild, guild.name);
 
+        /**
+         * Mainnet uild tables are updated
+         */
         if (isMainnet) {
           guild.isMainnet = true;
           guild.mainnet_url = producer.url;
@@ -121,6 +124,9 @@ async function updateGuildTable(isMainnet: boolean) {
               mainnet_url: guild.mainnet_url,
             });
           }
+          /**
+           * Testnet guild tables are updated
+           */
         } else {
           guild.isTestnet = true;
           guild.testnet_url = producer.url;
@@ -144,7 +150,6 @@ async function updateGuildTable(isMainnet: boolean) {
         }
       }
     }
-    console.log(counter);
   } catch (error) {
     logger.fatal("Error while updating guildTable", error);
   }
