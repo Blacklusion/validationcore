@@ -7,38 +7,91 @@ import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
 
-async function validateGuild(guildName: string) {
+/**
+ * STARTUP:
+ *  - Connection to database
+ *  - Initialization of interval based validation
+ */
+function main() {
+  logger.info("Starting up " + config.get("general.name") + "...");
+
+  // Check if Pager mode is enabled
+  if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
+    logger.info("Pager mode is disabled. No pager messages will be sent.");
+
+  createConnection()
+    .then(async (database) => {
+      logger.info("Successfully connected to database ");
+
+      /**
+       * Initialize interval based validations
+       */
+      await validateAllGuilds();
+      setInterval(validateAllGuilds, 600000);
+    })
+    .catch((error) => {
+      logger.error("Error while connecting to database ", error);
+    });
+}
+main();
+
+/**
+ * Validates all guilds tracked by the database
+ * The guild tables are updated before validating
+ */
+async function validateAllGuilds() {
   const database = getConnection();
-  const guild = await database.manager.findOne(Guild, {
-    where: [{ name: guildName }],
+
+  console.log("\n\n\n");
+  logger.info("STARTING NEW VALIDATION");
+
+  /**
+   * Update Guildinformation in guildtable
+   */
+  await updateGuildTable(true);
+  await updateGuildTable(false);
+
+  /**
+   * Validate every guild in guildTable
+   */
+  await database.manager.find(Guild).then((guilds) => {
+    guilds.forEach((guild) => {
+      if (!guild) {
+        logger.error('Requested Guild "' + "guildName" + '" is not tracked in the Database. Aborting Validation...');
+        return;
+      }
+
+      /**
+       * Validate Guild for Mainnet
+       */
+      if (guild.isMainnet) {
+        validateAll(guild, true);
+      }
+
+      /**
+       * Validate Guild for Testnet
+       */
+      if (guild.isTestnet) {
+        validateAll(guild, false);
+      }
+    });
   });
-  if (!guild) {
-    logger.error('Requested Guild "' + guildName + '" is not tracked in the Database. Aborting Validation...');
-    return;
-  }
-
-  /**
-   * Validate Guild for Mainnet
-   */
-  if (guild.isMainnet) {
-    await validateAll(guild, true);
-  }
-
-  /**
-   * Validate Guild for Testnet
-   */
-  if (guild.isTestnet) {
-    await validateAll(guild, false);
-  }
 }
 
+/**
+ * Gets all active producers from an Api and adds new guilds to the database
+ * @param isMainnet = determines if guilds for Testnet or Mainnet are added
+ */
 async function updateGuildTable(isMainnet: boolean) {
   const database = getConnection();
+
+  // Prepare Api Access
   const rpc = new JsonRpc(isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint"), {
     fetch,
   });
 
   try {
+    // Get producers from Api
     let results = await rpc.get_producers(true, "", config.get("validation.producer_limit"));
     results = { ...results.rows };
 
@@ -46,7 +99,8 @@ async function updateGuildTable(isMainnet: boolean) {
     for (const i in results) {
       const producer = results[i];
 
-      if (producer && producer.is_active == 1 && producer.url && producer.url) {
+      // Pursue only if guild is not a dummy guild
+      if (producer && producer.is_active == 1 && producer.url && producer.owner) {
         counter++;
         const guild = new Guild();
         guild.name = producer.owner;
@@ -96,67 +150,10 @@ async function updateGuildTable(isMainnet: boolean) {
   }
 }
 
-function main() {
-  logger.info("Starting up " + config.get("general.name") + "...");
-
-  if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
-    logger.info("Pager mode is disabled. No pager messages will be sent.");
-
-  createConnection()
-    .then(async (database) => {
-      // todo: add database name here
-      logger.info("Successfully connected to database ");
-
-      const guildName = "blacklusionx";
-      // await validateGuild(guildName)
-      await validateAllGuilds();
-
-      setInterval(validateAllGuilds, 600000);
-    })
-    .catch((error) => {
-      logger.error("Error while connecting to database ", error);
-    });
-}
-
-async function validateAllGuilds() {
-  const database = getConnection();
-
-  console.log("\n\n\n");
-  logger.info("STARTING NEW VALIDATION");
-
-  /**
-   * Update Guildinformation in guildtable
-   */
-  await updateGuildTable(true);
-  await updateGuildTable(false);
-
-  /**
-   * Validate every guild in guildTable
-   */
-  await database.manager.find(Guild).then((guilds) => {
-    guilds.forEach((guild) => {
-      if (!guild) {
-        logger.error('Requested Guild "' + "guildName" + '" is not tracked in the Database. Aborting Validation...');
-        return;
-      }
-
-      /**
-       * Validate Guild for Mainnet
-       */
-      if (guild.isMainnet) {
-        validateAll(guild, true);
-      }
-
-      /**
-       * Validate Guild for Testnet
-       */
-      if (guild.isTestnet) {
-        validateAll(guild, false);
-      }
-    });
-  });
-}
-
+/**
+ * Method used for TESTING purposes
+ * Adds a single guild to database
+ */
 async function addGuild() {
   const database = getConnection();
   const guild: Guild = new Guild();
@@ -170,18 +167,28 @@ async function addGuild() {
   await database.manager.save(guild);
 }
 
-main();
+/**
+ * Method used for TESTING purposes
+ * Validates a single guild
+ * @param guildName = Name of guild on chain
+ */
+async function validateGuild(guildName: string) {
+  const database = getConnection();
+  const guild = await database.manager.findOne(Guild, {
+    where: [{ name: guildName }],
+  });
+  if (!guild) {
+    logger.error('Requested Guild "' + guildName + '" is not tracked in the Database. Aborting Validation...');
+    return;
+  }
 
-function pingWebsite(url: string) {
-  HttpRequest.get(url)
-    .then((response) => {
-      console.log("*** SUCCESS ***");
-      console.log("*** TRUE *** Website is online");
-    })
-    .catch((error) => {
-      console.log("*** ERROR ***");
-      console.log(error);
-    });
+   // Validate Guild for Mainnet
+  if (guild.isMainnet) {
+    await validateAll(guild, true);
+  }
+
+  // Validate Guild for Testnet
+  if (guild.isTestnet) {
+    await validateAll(guild, false);
+  }
 }
-
-// pingWebsite(tesUrl);

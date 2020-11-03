@@ -6,10 +6,12 @@ import { logger } from "../common";
 import { sleep } from "eosio-protocol";
 import * as config from "config";
 
+
 /**
  * GET request
  * @param url = http url
- * @param path = path with or without tracing dash ('/')
+ * @param path = api request path
+ * @param retryCounter = how often should the request be repeated in case it fails
  */
 export async function get(
   url: string,
