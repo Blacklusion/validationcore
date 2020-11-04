@@ -31,7 +31,7 @@ export async function validateAll(
 ): Promise<History> {
   if (!apiEndpoint) return undefined;
 
-  let pagerMessages: Array<string> = [];
+  let pagerMessages: Array<[string, boolean]> = [];
 
   const database = getConnection();
   const history: History = new History();
@@ -634,12 +634,8 @@ export async function validateAll(
     sendMessageHistory(
       guild.name,
       isMainnet,
-      "<b>" +
-        (isMainnet ? "Mainnet" : "Testnet") +
-        " History results for: " +
-        apiEndpoint +
-        "</b> \\n" +
-        pagerMessages.join("\\n")
+      apiEndpoint,
+      pagerMessages
     );
 
   return history;

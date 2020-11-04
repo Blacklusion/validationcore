@@ -38,7 +38,7 @@ export async function validateAll(
 
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  let pagerMessages: Array<string> = [];
+  let pagerMessages: Array<[string, boolean]> = [];
 
   // Create api object for database
   const database = getConnection();
@@ -533,12 +533,8 @@ export async function validateAll(
     sendMessageApi(
       guild.name,
       isMainnet,
-      "<b>" +
-        (isMainnet ? "Mainnet" : "Testnet") +
-        " Api results for: " +
-        apiEndpoint +
-        "</b> \\n" +
-        pagerMessages.join("\\n")
+      apiEndpoint,
+      pagerMessages
     );
 
   return api;

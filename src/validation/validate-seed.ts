@@ -284,7 +284,7 @@ export async function validateAll(
 
   // Set general variables
   const api: string = isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint");
-  let pagerMessages: Array<string> = [];
+  let pagerMessages: Array<[string, boolean]> = [];
 
   // Create seed object for database
   const database = getConnection();
@@ -406,12 +406,8 @@ export async function validateAll(
     sendMessageSeed(
       guild.name,
       isMainnet,
-      "<b>" +
-        (isMainnet ? "Mainnet" : "Testnet") +
-        " P2P results for: " +
-        p2pEndpoint +
-        "</b> \\n" +
-        pagerMessages.join("\\n")
+      p2pEndpoint,
+      pagerMessages
     );
 
   return seed;

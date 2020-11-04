@@ -8,7 +8,8 @@ import "reflect-metadata";
 import { getConnection } from "typeorm";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
-import { evaluateMessage, sendMessageOrganization } from "../telegramHandler";
+import { sendMessageOrganization } from "../telegramHandler";
+import { evaluateMessage } from "../messageHandler";
 import { Api } from "../database/entity/Api";
 import { Seed } from "../database/entity/Seed";
 
@@ -21,7 +22,7 @@ const childLogger: Logger = logger.getChildLogger({
 
 /**
  * Validates regged producer information, chains.json and bp.json for specified guild
- * Only one chain (mainnet or testnet) will be evaluated by method at a time
+ * Only one chain (mainnet or testnet) will be evaluated
  * @param guild
  * @param isMainnet
  */
@@ -30,7 +31,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
   const url: string = isMainnet ? guild.mainnet_url : guild.testnet_url;
   const chainId: string = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
   let path: string;
-  let pagerMessages: Array<string> = [];
+  let pagerMessages: Array<[string, boolean]> = [];
 
   // Create organization object for database
   const database = getConnection();
@@ -608,7 +609,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
     sendMessageOrganization(
       guild.name,
       isMainnet,
-      "<b>" + (isMainnet ? "Mainnet" : "Testnet") + " Organization Results:</b> \\n" + pagerMessages.join("\\n")
+      pagerMessages
     );
 }
 
