@@ -400,6 +400,43 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
           )
         );
 
+        /**
+         * Test 3. : Other resources
+         */
+        // state = true
+        let otherResourcesIncorrectMessage = "are invalid: "
+        if (orgExists && response.data.org["other_resources"]) {
+          const resourcesArray = response.data.org["other_resources"];
+
+          if (resourcesArray.isArray) {
+            resourcesArray.forEach(resource => {
+              try {
+                new URL(resource)
+              } catch (e) {
+                /*
+                if (!state)
+                  otherResourcesIncorrectMessage += ", "
+                 */
+                otherResourcesIncorrectMessage += resource + "(invalid url)"
+                // state = false
+              }
+            })
+          } else {
+            // state = false
+            otherResourcesIncorrectMessage = "are not a valid array"
+          }
+        }
+
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_email_ok,
+            organization.bpjson_email_ok,
+            "Other resources in " + pathToBpJson,
+            "are valid",
+            otherResourcesIncorrectMessage
+          )
+        );
+
 
         /**
          * Test 3.7: branding
