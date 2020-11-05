@@ -330,6 +330,58 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         );
 
         /**
+         * Test : GitHub User
+         */
+
+        // todo: add organization github_user database
+        let gitHubUserIncorrectMessage = "";
+        if (orgExists && response.data.org["github_user"]) {
+          // Get github_user from json
+          const gitHubUserObj = response.data.org["github_user"];
+
+          // More than one GitHub user supplied
+          if (gitHubUserObj.isArray) {
+            let allUsersOk = gitHubUserObj.length >= 1;
+            gitHubUserIncorrectMessage = "was provided but has invalid formatting ("
+
+            for (const gitHubUser of gitHubUserObj) {
+              if (!(new RegExp(".+").test(gitHubUser) &&
+                !new RegExp("https?://.+").test(gitHubUser.toLowerCase()) &&
+                !new RegExp("^@").test(gitHubUser))) {
+                gitHubUserIncorrectMessage += (allUsersOk ? "" : ", ") + gitHubUser;
+                allUsersOk = false;
+              }
+            }
+
+            gitHubUserIncorrectMessage += ")"
+
+            // One GitHub user supplied
+          } else {
+            const githubuserstate = new RegExp(".+").test(gitHubUserObj) &&
+            !new RegExp("https?://.+").test(gitHubUserObj.toLowerCase()) &&
+            !new RegExp("^@").test(gitHubUserObj)
+
+            if (!githubuserstate)
+              gitHubUserIncorrectMessage = "was provided, but has invalid formatting (" + gitHubUserObj + ")"
+          }
+        } else {
+          gitHubUserIncorrectMessage = "was not provided"
+        }
+
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_email_ok,
+            organization.bpjson_email_ok,
+            "GitHub user in " + pathToBpJson,
+            "was provided (min. 1)",
+            gitHubUserIncorrectMessage
+          )
+        );
+
+
+
+
+        /**
          * Test 3.7: branding
          */
         let brandingIncorrectMessage = "invalid";
