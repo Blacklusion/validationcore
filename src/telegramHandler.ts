@@ -36,7 +36,7 @@ function sendMessage(guildName: string, isMainnet: boolean, headermessage: strin
   HttpRequest.post(
     url,
     path,
-    '{"guild_name": "' + guildName + '", "isMainnet": ' + isMainnet + ', "headerMessage": ' + headermessage + ', "messages": "' + messages + '"}'
+    '{"guild_name": "' + guildName + '", "isMainnet": ' + isMainnet + ', "headerMessage": ' + headermessage + ', "messages": "' + messagesJson + '"}'
   )
     .then((response) => {
       logger.debug(path + "\t Successfully sent message for " + guildName);
