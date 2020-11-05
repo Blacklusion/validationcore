@@ -378,6 +378,31 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
           )
         );
 
+        /**
+         * Test 3. : Chain resources
+         */
+
+        let chainResourcesIncorrectMessage = ""
+        if (orgExists && response.data.org["chain_resources"]) {
+          try {
+            new URL(response.data.org["chain_resources"])
+          } catch (e) {
+            chainResourcesIncorrectMessage = "is not a valid url. Arrays are not allowed"
+          }
+        } else {
+          chainResourcesIncorrectMessage = "was not provided"
+        }
+
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_email_ok,
+            organization.bpjson_email_ok,
+            "Chain resources in " + pathToBpJson,
+            "was provided",
+            chainResourcesIncorrectMessage
+          )
+        );
+
 
 
 
