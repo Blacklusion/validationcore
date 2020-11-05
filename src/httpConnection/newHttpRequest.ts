@@ -4,8 +4,8 @@ import { HttpResponse } from "./newHttpResponse";
 export async function request (
   base: string,
   path = "",
-  retryCounter: number = config.get("validation.request_retry_count"),
   payloadAsJson: string = undefined,
+  retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
 ): HttpResponse {
   const response = new HttpResponse();

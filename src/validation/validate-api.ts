@@ -8,6 +8,7 @@ import { Api } from "../database/entity/Api";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { evaluateMessage, sendMessageApi } from "../telegramHandler";
+import * as http from "../httpConnection/newHttpRequest"
 
 /**
  * Logger Settings for Api
@@ -35,7 +36,13 @@ export async function validateAll(
   locationOk: boolean,
   features: string[]
 ): Promise<Api> {
-  if (!apiEndpoint) return undefined;
+  // Check if valid ApiEndpoint url has been provided
+  try {
+    new URL(apiEndpoint)
+  } catch (e) {
+    return undefined;
+  }
+
 
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
@@ -83,11 +90,23 @@ export async function validateAll(
   /**
    * 1. Test: Basic Checks
    */
-  let getInfoMessage = "";
-  await HttpRequest.post(apiEndpoint, "/v1/chain/get_info", '{"json": true}')
+  await http.request(apiEndpoint, "/v1/chain/get_info", '{"json": true}')
     .then((response) => {
-      api.get_info_ok = response.isJson;
+      api.get_info_ok = response.isOk && response.isJson();
       api.get_info_ms = response.elapsedTimeInMilliseconds;
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.head_block_delta_ok,
+          api.head_block_delta_ok,
+          "Get_info request",
+          "successful",
+          "not successful" + response.getFormattedErrorMessage()
+        )
+      );
+
+      if (!api.get_info_ok)
+        return;
 
       /**
        * Test 1.1: Server Version
@@ -95,17 +114,12 @@ export async function validateAll(
       const serverVersions: Array<string> = config.get(
         isMainnet ? "mainnet.server_versions" : "testnet.server_versions"
       );
+      // todo: test code
       let serverVersion = response.data["server_version_string"] ? response.data["server_version_string"] : "unknown";
-      if (serverVersions.includes(serverVersion)) {
-        childLogger.debug("TRUE \t Node running correct Server Version");
-        api.server_version_ok = true;
-        serverVersion = response.data["server_version_string"];
-        api.server_version = serverVersion;
-      } else {
-        childLogger.debug("FALSE \t Server is not running correct Server Version");
-        api.server_version_ok = false;
-      }
-      pagerMessages.push(
+        api.server_version_ok = serverVersions.includes(serverVersion);
+        api.server_version = response.data["server_version_string"];
+
+        pagerMessages.push(
         evaluateMessage(
           lastValidation.server_version_ok,
           api.server_version_ok,
@@ -118,13 +132,8 @@ export async function validateAll(
       /**
        * Test 1.2: Api for correct chain
        */
-      if (typeof response.data["chain_id"] == "string" && response.data["chain_id"] === chainId) {
-        childLogger.debug("TRUE \t Provided Api for correct Chain");
-        api.correct_chain = true;
-      } else {
-        childLogger.debug("FALSE \t Provided Api for wrong Chain");
-        api.correct_chain = false;
-      }
+        api.correct_chain = typeof response.data["chain_id"] == "string" && response.data["chain_id"] === chainId;
+
       pagerMessages.push(
         evaluateMessage(
           lastValidation.correct_chain,
@@ -138,8 +147,9 @@ export async function validateAll(
       /**
        * Test 1.3: Head Block up to date
        */
-      let heaadBlockmessage = "";
+      let headBlockIncorrectMessage = "";
       if (typeof response.data["head_block_time"] == "string") {
+        // Get current time
         let currentDate: number = Date.now();
 
         // Use time of http request if available in order to avoid server or validation time delay
@@ -149,14 +159,14 @@ export async function validateAll(
 
         // "+00:00" is necessary for defining date as UTC
         const timeDelta: number = currentDate - new Date(response.data["head_block_time"] + "+00:00").getTime();
-        if (Math.abs(timeDelta) < config.get("validation.api_head_bock_time_delta")) {
-          childLogger.debug("TRUE \t Head Block is up to date; Delta: " + timeDelta);
-          api.head_block_delta_ok = true;
-          api.head_block_delta_ms = timeDelta;
-        } else {
-          childLogger.debug("FALSE \t Head Block not up to date; Delta: " + timeDelta);
-          api.head_block_delta_ok = false;
-          heaadBlockmessage =
+
+        // Check if headBlock is within the allowed delta
+        api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_bock_time_delta");
+        api.head_block_delta_ms = timeDelta;
+
+        // Format message if head block delta is not within the allowed range
+        if (!api.head_block_delta_ok){
+          headBlockIncorrectMessage =
             ": " +
             timeDelta / 1000 +
             "sec behind. Only a delta of " +
@@ -164,9 +174,8 @@ export async function validateAll(
             "sec is tolerated";
         }
       } else {
-        childLogger.debug("FALSE \t NO Head block time provided");
         api.head_block_delta_ok = false;
-        heaadBlockmessage = ": could not be read from api";
+        headBlockIncorrectMessage = ": could not be read from api";
       }
       pagerMessages.push(
         evaluateMessage(
@@ -174,24 +183,10 @@ export async function validateAll(
           api.head_block_delta_ok,
           "Head block",
           "is up-to-date",
-          "is not up-to-date" + heaadBlockmessage
+          "is not up-to-date" + headBlockIncorrectMessage
         )
       );
     })
-    .catch((error) => {
-      childLogger.debug("FALSE \t /v1/chain/get_info not reachable", error);
-      api.get_info_ok = false;
-      getInfoMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.head_block_delta_ok,
-      api.head_block_delta_ok,
-      "Get_info request",
-      "successful",
-      "not successful" + getInfoMessage
-    )
-  );
 
   /**
    * Test 2: Block one exists
