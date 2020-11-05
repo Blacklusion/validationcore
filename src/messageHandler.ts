@@ -26,7 +26,7 @@ export function evaluateMessage(
  */
 export function convertArrayToJson(array: [string, boolean][]): any {
 
-  // Parse Array to jsonlike formatting
+  // Parse Array to jsonLike formatting
   let jsonString = "["
   array.forEach((value, index, array) => {
     jsonString += "\n" + '"' + value[0] + '": ' + value[1]
