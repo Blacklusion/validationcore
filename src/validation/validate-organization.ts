@@ -631,7 +631,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
                   lastApiValidation,
                   node.api_endpoint,
                   false,
-                  locationOk
+                  locationOk,
+                  node.features
                 );
                 // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
                 if (apiNode) organization.nodes_api.push(apiNode);
@@ -643,7 +644,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
                   lastSslValidation,
                   node.ssl_endpoint,
                   true,
-                  locationOk
+                  locationOk,
+                  node.features
                 );
 
                 // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)

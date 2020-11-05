@@ -32,7 +32,8 @@ export async function validateAll(
   lastValidation: Api,
   apiEndpoint: string,
   isSsl: boolean,
-  locationOk: boolean
+  locationOk: boolean,
+  features: string[]
 ): Promise<Api> {
   if (!apiEndpoint) return undefined;
 
