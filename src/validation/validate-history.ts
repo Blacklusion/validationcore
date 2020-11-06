@@ -630,13 +630,7 @@ export async function validateAll(
    * Send Message to all subscribers of guild via. public telegram service
    */
   pagerMessages = pagerMessages.filter((message) => message);
-  if (pagerMessages.length > 0)
-    sendMessageHistory(
-      guild.name,
-      isMainnet,
-      apiEndpoint,
-      pagerMessages
-    );
+  if (pagerMessages.length > 0) sendMessageHistory(guild.name, isMainnet, apiEndpoint, pagerMessages);
 
   return history;
 }

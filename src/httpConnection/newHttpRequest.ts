@@ -1,7 +1,7 @@
 import * as fetch from "node-fetch";
 import { HttpResponse } from "./newHttpResponse";
 
-export async function request (
+export async function request(
   base: string,
   path = "",
   payloadAsJson: string = undefined,
@@ -29,30 +29,28 @@ export async function request (
   // Send Request
   if (!payloadAsJson) {
     await fetch(urlWithPath, {
-      method: 'GET', headers: {
-        "request-startTime": Date.now()
-      }
-    })
+      method: "GET",
+      headers: {
+        "request-startTime": Date.now(),
+      },
+    });
   } else {
-
     // todo: decide if really necessary
     // todo: check if content type match is necessary
     try {
-      JSON.parse(payloadAsJson)
+      JSON.parse(payloadAsJson);
     } catch (e) {
-      response.setErrorMessage("Payload for post request is not valid JSON")
+      response.setErrorMessage("Payload for post request is not valid JSON");
       return response;
     }
 
     await fetch(urlWithPath, {
-      method: 'POST', headers: {
+      method: "POST",
+      headers: {
         "request-startTime": Date.now(),
         "content-type": contentType,
       },
-      data: payloadAsJson
-    })
-
-
+      data: payloadAsJson,
+    });
   }
-
 }

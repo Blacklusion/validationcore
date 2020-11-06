@@ -11,9 +11,9 @@ export function evaluateMessage(
     logger.warn("NewValidation is null. This should not be the case. Check code. " + message + " " + correctMessage);
   }
   if ((oldValidation == null || oldValidation == true) && (newValidation == false || newValidation == null)) {
-    return [message + " " + incorrectMessage, false]
+    return [message + " " + incorrectMessage, false];
   } else if ((oldValidation == null || oldValidation == false) && newValidation == true) {
-    return [message + " " + correctMessage, true]
+    return [message + " " + correctMessage, true];
   }
   return undefined;
 }
@@ -25,14 +25,12 @@ export function evaluateMessage(
  * @param array
  */
 export function convertArrayToJson(array: [string, boolean][]): any {
-
   // Parse Array to jsonLike formatting
-  let jsonString = "["
+  let jsonString = "[";
   array.forEach((value, index, array) => {
-    jsonString += "\n" + '"' + value[0] + '": ' + value[1]
-    if (index !== array.length - 1)
-      jsonString += ","
-  })
+    jsonString += "\n" + '"' + value[0] + '": ' + value[1];
+    if (index !== array.length - 1) jsonString += ",";
+  });
   jsonString += "]";
 
   return jsonString;

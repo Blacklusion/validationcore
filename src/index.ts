@@ -187,7 +187,7 @@ async function validateGuild(guildName: string) {
     return;
   }
 
-   // Validate Guild for Mainnet
+  // Validate Guild for Mainnet
   if (guild.isMainnet) {
     await validateAll(guild, true);
   }

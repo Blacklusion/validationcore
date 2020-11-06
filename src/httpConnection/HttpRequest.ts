@@ -6,7 +6,6 @@ import { logger } from "../common";
 import { sleep } from "eosio-protocol";
 import * as config from "config";
 
-
 /**
  * GET request
  * @param url = http url
@@ -68,7 +67,6 @@ export async function post(
   retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
 ): Promise<HttpResponse> {
-
   // todo: implement no url provided and invalid url error
   if (!url) {
     throw new HttpError(1, 0, "No url was provided");

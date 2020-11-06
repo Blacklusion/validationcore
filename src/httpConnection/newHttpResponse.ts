@@ -1,4 +1,3 @@
-
 export class NewHttpResponse {
   // Header of HttpResponse
   headers: any;
@@ -11,8 +10,7 @@ export class NewHttpResponse {
 
   isOk: boolean;
 
-  errorMessage = ""
-
+  errorMessage = "";
 
   /**
    * Checks if body can be parsed into a valid JSON
@@ -32,9 +30,7 @@ export class NewHttpResponse {
   }
 
   public getFormattedErrorMessage() {
-    if (!this.errorMessage)
-      return "";
-    else
-      return ": " + this.errorMessage;
+    if (!this.errorMessage) return "";
+    else return ": " + this.errorMessage;
   }
 }

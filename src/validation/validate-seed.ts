@@ -402,13 +402,7 @@ export async function validateAll(
    * Send Message to all subscribers of guild via. public telegram service
    */
   pagerMessages = pagerMessages.filter((message) => message);
-  if (pagerMessages.length > 0)
-    sendMessageSeed(
-      guild.name,
-      isMainnet,
-      p2pEndpoint,
-      pagerMessages
-    );
+  if (pagerMessages.length > 0) sendMessageSeed(guild.name, isMainnet, p2pEndpoint, pagerMessages);
 
   return seed;
 }
