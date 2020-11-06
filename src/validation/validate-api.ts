@@ -209,7 +209,6 @@ export async function validateAll(
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
     api.verbose_error_ok = !response.isOk && Object.keys(response.data.error.details).length != 0;
-
     pagerMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,

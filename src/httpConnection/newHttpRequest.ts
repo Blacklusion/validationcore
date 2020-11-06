@@ -1,4 +1,5 @@
 import * as fetch from "node-fetch";
+import * as config from "config";
 import { HttpResponse } from "./newHttpResponse";
 
 export async function request(
@@ -28,12 +29,16 @@ export async function request(
 
   // Send Request
   if (!payloadAsJson) {
-    await fetch(urlWithPath, {
+    await timeout(fetch(urlWithPath, {
       method: "GET",
       headers: {
         "request-startTime": Date.now(),
       },
-    });
+    })).then(fetchResponse => {
+      response.parseFetchResponse(fetchResponse);
+    }).catch(e => {
+      response.parseFetchError(e)
+    });;
   } else {
     // todo: decide if really necessary
     // todo: check if content type match is necessary
@@ -44,13 +49,41 @@ export async function request(
       return response;
     }
 
-    await fetch(urlWithPath, {
-      method: "POST",
-      headers: {
-        "request-startTime": Date.now(),
-        "content-type": contentType,
-      },
-      data: payloadAsJson,
-    });
+      await timeout(fetch(urlWithPath, {
+        method: "POST",
+        headers: {
+          "request-startTime": Date.now(),
+          "content-type": contentType,
+        },
+        data: payloadAsJson,
+      })).then(fetchResponse => {
+        response.parseFetchResponse(fetchResponse);
+      }).catch(e => {
+        response.parseFetchError(e)
+      });
   }
+}
+
+/**
+ * Throws an error if promise is not resolved within the specified amount of timeoutMs
+ * @param promise = promise to be resolved (e.g. fetch request)
+ * @return {Promise<unknown>}
+ */
+function timeout(promise): Promise<Response> {
+  const timeoutMs = config.get("validation.request_timeout_ms");
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error("Timeout"));
+    }, timeoutMs);
+    promise.then(
+      (res) => {
+        clearTimeout(timeoutId);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      }
+    );
+  });
 }
