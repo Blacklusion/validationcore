@@ -191,64 +191,44 @@ export async function validateAll(
   /**
    * Test 2: Block one exists
    */
-  let blockOneMessage = "";
-  await HttpRequest.post(apiEndpoint, "/v1/chain/get_block", '{"block_num_or_id": "1", "json": true}')
+  await http.request(apiEndpoint, "/v1/chain/get_block", '{"block_num_or_id": "1", "json": true}')
     .then((response) => {
-      childLogger.debug("TRUE \t Block One is available");
-      api.block_one_ok = response.isJson;
+
+      api.block_one_ok = response.isOk && response.isJson();
       api.block_one_ms = response.elapsedTimeInMilliseconds;
-      if (!response.isJson) blockOneMessage = ": invalid Json formatting";
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.block_one_ok,
+          api.block_one_ok,
+          "Block one test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
     })
-    .catch((error) => {
-      childLogger.debug("FALSE \t Block One is not available", error);
-      api.block_one_ok = false;
-      blockOneMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.block_one_ok,
-      api.block_one_ok,
-      "Block one test",
-      "passed",
-      "not passed" + blockOneMessage
-    )
-  );
 
   /**
    * Test 3: Verbose Error
    */
-  let verboseErrorMessage = "";
-  await HttpRequest.post(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0)
+  await http.request(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0)
     .then((response) => {
-      // childLogger.debug("FALSE \t Verbose error test not passed");
-      // api.verbose_error_ok = false;#
-      throw new Error();
-    })
-    .catch((error) => {
-      try {
-        if (Object.keys(error.response.data.error.details).length != 0) {
-          childLogger.debug("TRUE \t Verbose error test passed");
-          api.verbose_error_ok = true;
-          api.verbose_error_ms = error.response.elapsedTimeInMilliseconds;
-        } else {
-          throw new Error();
-        }
-      } catch (e) {
-        childLogger.debug("FALSE \t Verbose error test not passed", error);
-        api.verbose_error_ok = false;
 
-        if (error.message) verboseErrorMessage = ": " + error.message;
-      }
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.verbose_error_ok,
-      api.verbose_error_ok,
-      "Verbose Error test",
-      "passed",
-      "not passed" + verboseErrorMessage
-    )
-  );
+      api.verbose_error_ms = response.elapsedTimeInMilliseconds;
+      // todo: ensure no check on undefined
+      api.verbose_error_ok = !response.isOk && (Object.keys(response.data.error.details).length != 0);
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.verbose_error_ok,
+          api.verbose_error_ok,
+          "Verbose Error test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
+
+    })
 
   /**
    * Test 4: abi serializer
@@ -257,8 +237,7 @@ export async function validateAll(
     config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") &&
     config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_bock_transaction_count")
   ) {
-    let abiErrorMessage = "";
-    await HttpRequest.post(
+    await http.request(
       apiEndpoint,
       "/v1/chain/get_block",
       '{"json": true, "block_num_or_id": ' +
@@ -266,44 +245,29 @@ export async function validateAll(
         "}"
     )
       .then((response) => {
-        if (
-          response.data.transactions &&
+        api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
+        api.abi_serializer_ok = response.isOk && response.data.transactions &&
           Object.keys(response.data.transactions).length ==
-            config.get(
-              isMainnet ? "mainnet.api_test_big_bock_transaction_count" : "testnet.api_test_big_bock_transaction_count"
-            )
-        ) {
-          childLogger.debug("TRUE \t Abi serializer test passed");
-          api.abi_serializer_ok = true;
-          api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
-        } else {
-          childLogger.debug(
-            "FALSE \t Abi serializer test not passed: Transaction count does not match expected count."
-          );
-          api.abi_serializer_ok = false;
-        }
+          config.get(
+            isMainnet ? "mainnet.api_test_big_bock_transaction_count" : "testnet.api_test_big_bock_transaction_count"
+          )
+
+        pagerMessages.push(
+          evaluateMessage(
+            lastValidation.abi_serializer_ok,
+            api.abi_serializer_ok,
+            "Abi serializer test",
+            "passed",
+            "not passed" + response.getFormattedErrorMessage()
+          )
+        );
       })
-      .catch((error) => {
-        childLogger.debug("FALSE \t Abi serializer test not passed", error);
-        api.abi_serializer_ok = false;
-        abiErrorMessage = ": " + error.message;
-      });
-    pagerMessages.push(
-      evaluateMessage(
-        lastValidation.abi_serializer_ok,
-        api.abi_serializer_ok,
-        "Abi serializer test",
-        "passed",
-        "not passed" + abiErrorMessage
-      )
-    );
   }
 
   /**
    * Test 5: basic symbol
    */
-  let basicSymbolMessage = "";
-  await HttpRequest.post(
+  await http.request(
     apiEndpoint,
     "/v1/chain/get_currency_balance",
     '{"json": true, "account": "' +
@@ -313,33 +277,24 @@ export async function validateAll(
       '"}'
   )
     .then((response) => {
-      if (Array.isArray(response.data) && response.data.length == 1) {
-        childLogger.debug("TRUE \t Basic Symbol check passed");
-        api.basic_symbol_ok = true;
+        api.basic_symbol_ok = response.isOk && Array.isArray(response.data) && response.data.length == 1;
         api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
-      } else {
-        childLogger.debug("FALSE \t Basic Symbol check not passed");
-        api.basic_symbol_ok = false;
-      }
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.basic_symbol_ok,
+          api.basic_symbol_ok,
+          "Basic symbol test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
     })
-    .catch((error) => {
-      childLogger.debug("FALSE \t Basic Symbol check not passed", error);
-      api.basic_symbol_ok = false;
-      basicSymbolMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.basic_symbol_ok,
-      api.basic_symbol_ok,
-      "Basic symbol test",
-      "passed",
-      "not passed" + basicSymbolMessage
-    )
-  );
 
   /**
    * Test 6: producer api disabled
    */
+    // todo
   let producerApiMessage = "";
   await HttpRequest.get(apiEndpoint, "/v1/producer/get_integrity_hash", 0)
     .then((response) => {
@@ -371,6 +326,7 @@ export async function validateAll(
   /**
    * Test 7: db_size api disabled
    */
+  // todo
   let dbSizeMessage = "";
   await HttpRequest.get(apiEndpoint, "/v1/db_size/get", 0)
     .then((response) => {
@@ -396,6 +352,7 @@ export async function validateAll(
   /**
    * Test 8: net api disabled
    */
+  // todo
   let netApiMessage = "";
   await HttpRequest.get(apiEndpoint, "/v1/net/connections", 0)
     .then((response) => {
@@ -421,65 +378,54 @@ export async function validateAll(
   /**
    * Test 9: Wallet - get_accounts_by_authorizers
    */
-  let walletAccountsMessage = "";
-  await HttpRequest.post(
+  await http.request(
     apiEndpoint,
     "/v1/chain/get_accounts_by_authorizers",
     '{"json": true, "accounts": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") + '"]}'
   )
     .then((response) => {
-      childLogger.debug("TRUE \t get_accounts_by_authorizers by accounts test passed");
-      api.wallet_accounts_ok = response.isJson;
+      api.wallet_accounts_ok = response.isOk && response.isJson();
       api.wallet_accounts_ms = response.elapsedTimeInMilliseconds;
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.wallet_accounts_ok,
+          api.wallet_accounts_ok,
+          "Wallet get_accounts_by_authorizers by accounts test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
     })
-    .catch((error) => {
-      childLogger.debug("FALSE \t get_accounts_by_authorizers by accounts test not passed");
-      api.wallet_accounts_ok = false;
-      walletAccountsMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.wallet_accounts_ok,
-      api.wallet_accounts_ok,
-      "Wallet get_accounts_by_authorizers by accounts test",
-      "passed",
-      "not passed" + walletAccountsMessage
-    )
-  );
 
   /**
    * Test 9: Wallet - get_accounts_by_authorizers
    */
-  let walletKeysMessage = "";
-  await HttpRequest.post(
+  await http.request(
     apiEndpoint,
     "/v1/chain/get_accounts_by_authorizers",
     '{"json": true, "keys": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"]}'
   )
     .then((response) => {
-      childLogger.debug("TRUE \t get_accounts_by_authorizers by keys test passed");
-      api.wallet_keys_ok = response.isJson;
+      api.wallet_keys_ok = response.isOk && response.isJson;
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.wallet_keys_ok,
+          api.wallet_keys_ok,
+          "Wallet get_accounts_by_authorizers by keys test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
     })
-    .catch((error) => {
-      childLogger.debug("FALSE \t get_accounts_by_authorizers by keys test not passed");
-      api.wallet_keys_ok = false;
-      walletKeysMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.wallet_keys_ok,
-      api.wallet_keys_ok,
-      "Wallet get_accounts_by_authorizers by keys test",
-      "passed",
-      "not passed" + walletKeysMessage
-    )
-  );
 
   /**
    * Set all checks ok
    * (location check is excluded, because a wrong location does not interfere with the function of an Api node
    */
+  // todo: check
   api.all_checks_ok =
     api.server_version_ok &&
     api.correct_chain &&
