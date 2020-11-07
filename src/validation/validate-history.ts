@@ -7,6 +7,8 @@ import { History } from "../database/entity/History";
 import { getConnection } from "typeorm";
 import { evaluateMessage, sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
+import * as http from "../httpConnection/newHttpRequest";
+import { readdirSync } from "fs";
 
 /**
  * Logger Settings for History
@@ -76,68 +78,65 @@ export async function validateAll(
   /**
    * Test 1.1 get_transaction
    */
-  let historyTransactionMessage = "";
-  await HttpRequest.post(
-    apiEndpoint,
-    "/v1/history/get_transaction",
-    '{"json": true, "id": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction") + '"}'
-  )
-    .then((response) => {
-      childLogger.debug("TRUE \t History get_transaction Test passed");
-      history.history_transaction_ok = true;
-      history.history_transaction_ms = response.elapsedTimeInMilliseconds;
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t get_transaction Test not passed");
-      history.history_transaction_ok = false;
-      historyTransactionMessage += error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.history_transaction_ok,
-      history.history_transaction_ok,
-      "History get_transaction test",
-      "passed",
-      "not passed" + historyTransactionMessage
+  await http
+    .request(
+      apiEndpoint,
+      "/v1/history/get_transaction",
+      '{"json": true, "id": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction") + '"}'
     )
-  );
+    .then((response) => {
+      history.history_transaction_ok = response.isOk && response.isJson();
+      history.history_transaction_ms = response.elapsedTimeInMilliseconds;
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.history_transaction_ok,
+          history.history_transaction_ok,
+          "History get_transaction test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
+    });
 
   /**
    * Test 1.2 get_actions
    */
-  let historyActionsMessage = "";
-  await HttpRequest.post(
-    apiEndpoint,
-    "/v1/history/get_actions",
-    '{"json": true, "pos": -1, "offset": -' +
-      config.get("validation.history_transaction_offset") +
-      ', "account_name": "eosio.token"}'
-  )
+  let historyActionsIncorrectMessage = "";
+  await http
+    .request(
+      apiEndpoint,
+      "/v1/history/get_actions",
+      '{"json": true, "pos": -1, "offset": -' +
+        config.get("validation.history_transaction_offset") +
+        ', "account_name": "eosio.token"}'
+    )
     .then((response) => {
       history.history_actions_ms = response.elapsedTimeInMilliseconds;
       let errorCounter = 0;
 
+      if (!response.isOk || !response.isJson()) {
+        historyActionsIncorrectMessage = response.getFormattedErrorMessage();
+        history.hyperion_actions_ok = false;
+        return;
+      }
+
       // Test if request is success
-      // todo: test if json
 
       // action request contains correct number of actions
       if (
-        Array.isArray(response.data.actions) &&
-        response.data.actions.length == config.get("validation.history_transaction_offset")
+        !(
+          Array.isArray(response.data.actions) &&
+          response.data.actions.length == config.get("validation.history_transaction_offset")
+        )
       ) {
-        childLogger.debug("TRUE \t get_acitons contains correct amount of actions");
-      } else {
-        childLogger.debug("FALSE \t does not contain correct amount of actions");
-        historyActionsMessage += ", returned incorrect number of actions";
+        historyActionsIncorrectMessage += ", returned incorrect number of actions";
         errorCounter++;
       }
 
       // action request contains last_irreversible_block
-      if (response.data["last_irreversible_block"]) {
-        childLogger.debug("TRUE \t last irreversible block provided in actions history");
-      } else {
-        childLogger.debug("FALSE \t last irreversible block not provided in actions history");
-        historyActionsMessage += ", last irreversible block not provided";
+      if (!response.data["last_irreversible_block"]) {
+        historyActionsIncorrectMessage += ", last irreversible block not provided";
         errorCounter++;
       }
 
@@ -155,37 +154,20 @@ export async function validateAll(
         // "+00:00" is necessary for defining date as UTC
         const timeDelta: number = new Date(response.data.actions[0].block_time + "+00:00").getTime() - currentDate;
 
-        if (Math.abs(timeDelta) < config.get("validation.history_actions_block_time_delta")) {
-          childLogger.debug("TRUE \t History contains recent eosio.ram action");
-        } else {
-          childLogger.debug(
-            "FALSE \t History is not up-to-date. eosio.ram action must not be older than " +
-              config.get("validation.history_actions_block_time_delta") / 60000 +
-              "min"
-          );
-          historyActionsMessage +=
+        if (!(Math.abs(timeDelta) < config.get("validation.history_actions_block_time_delta"))) {
+          historyActionsIncorrectMessage +=
             ", last eosio.ram action older than " +
             config.get("validation.history_actions_block_time_delta") / 60000 +
             "min";
           errorCounter++;
         }
       } else {
-        childLogger.debug("FALSE \t no block_time provided");
-        historyActionsMessage += ", no block_time provided";
+        historyActionsIncorrectMessage += ", no block_time provided";
         errorCounter++;
       }
 
-      if (errorCounter == 0) {
-        childLogger.debug("TRUE \t History Get transaction Test passed");
-        history.history_actions_ok = true;
-      } else {
-        history.history_actions_ok = false;
-      }
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t History Get transaction Test not passed");
-      history.history_actions_ok = false;
-      if (error.message) historyActionsMessage = ": " + error.message;
+      // Status ok if all checks are passed
+      history.history_actions_ok = errorCounter == 0;
     });
   pagerMessages.push(
     evaluateMessage(
@@ -193,47 +175,44 @@ export async function validateAll(
       history.history_actions_ok,
       "History get_actions test",
       "passed",
-      "not passed" + historyActionsMessage
+      "not passed" + historyActionsIncorrectMessage
     )
   );
 
   /**
    * Test 1.3 get_key_accounts
    */
-  let historyKeyMessage = "";
-  await HttpRequest.post(
-    apiEndpoint,
-    "/v1/history/get_key_accounts",
-    '{"json": true, "public_key": "' +
-      config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") +
-      '"}'
-  )
+  await http
+    .request(
+      apiEndpoint,
+      "/v1/history/get_key_accounts",
+      '{"json": true, "public_key": "' +
+        config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") +
+        '"}'
+    )
     .then((response) => {
       history.history_key_accounts_ms = response.elapsedTimeInMilliseconds;
-      if (response.data["account_names"]) {
-        childLogger.debug("TRUE \t History Key Accounts Test passed");
-        history.history_key_accounts_ok = true;
-      } else {
-        childLogger.debug("FALSE \t History Key Accounts Test passed");
-        history.history_key_accounts_ok = false;
-        historyKeyMessage += ": invalid response format";
-      }
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t History Key Accounts Test not passed");
-      history.history_key_accounts_ok = false;
-      historyKeyMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.history_key_accounts_ok,
-      history.history_key_accounts_ok,
-      "History get_key_accounts test",
-      "passed",
-      "not passed" + historyKeyMessage
-    )
-  );
 
+      let historyKeyIncorrectMessage = ": invalid response format";
+      if (!response.isOk) {
+        historyKeyIncorrectMessage = response.getFormattedErrorMessage();
+        history.history_key_accounts_ok = false;
+      } else {
+        history.history_key_accounts_ok = response.data["account_names"] && response.isJson;
+      }
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.history_key_accounts_ok,
+          history.history_key_accounts_ok,
+          "History get_key_accounts test",
+          "passed",
+          "not passed" + historyKeyIncorrectMessage
+        )
+      );
+    });
+
+  // todo: check
   history.history_all_checks_ok =
     history.history_transaction_ok && history.history_key_accounts_ok && history.history_actions_ok;
 
@@ -244,377 +223,327 @@ export async function validateAll(
   /**
    * Test 2.1 Hyperion Health
    */
-  await HttpRequest.get(apiEndpoint, "/v2/health")
-    .then((response) => {
-      // Test 2.1.1 Health version
-      if (response.data.version) {
-        childLogger.debug("TRUE \t Hyperion version provided in /v2/health");
-        history.hyperion_health_version_ok = true;
+  await http.request(apiEndpoint, "/v2/health").then((response) => {
+    // Test 2.1.1 Health version
+    history.hyperion_health_version_ok = response.data.version;
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.hyperion_health_version_ok,
+        history.hyperion_health_version_ok,
+        "Hyperion version",
+        "provided in /v2/health",
+        "not provided in /v2/health"
+      )
+    );
+
+    // Test 2.1.2 Health Host
+    history.hyperion_health_host_ok = response.data.host;
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.hyperion_health_host_ok,
+        history.hyperion_health_host_ok,
+        "Hyperion host",
+        "provided in /v2/health",
+        "not provided in /v2/health"
+      )
+    );
+
+    // Test 2.1.3 Query Time
+    let queryTimeIncorrectMessage = "not provided";
+    if (response.data.query_time_ms) {
+      history.hyperion_health_query_time_ms = Math.round(response.data.query_time_ms);
+      queryTimeIncorrectMessage = "not ok (" + history.hyperion_health_query_time_ms + ")";
+    }
+    history.hyperion_health_query_time_ok =
+      response.data.query_time_ms && response.data.query_time_ms < config.get("validation.hyperion_query_time_ms");
+
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.history_key_accounts_ok,
+        history.history_key_accounts_ok,
+        "Hyperion query time",
+        "ok",
+        queryTimeIncorrectMessage
+      )
+    );
+
+    /**
+     * Test 2.1.4 Features
+     */
+    let featureMessage = "";
+    if (!response.data.features) {
+      featureMessage = ", features array is missing";
+      history.hyperion_health_all_features_ok = false;
+    } else {
+      let errorCounter = 0;
+      // tables
+      if (!response.data.features.tables) {
+        featureMessage = ", features.tables array missing";
       } else {
-        childLogger.debug("FALSE \t Hyperion version not provided in /v2/health");
-        history.hyperion_health_version_ok = false;
+        // tables/proposals enabled
+        if (response.data.features.tables.proposals == true) {
+          history.hyperion_health_features_tables_proposals_on = true;
+        } else {
+          history.hyperion_health_features_tables_proposals_on = false;
+          errorCounter++;
+          featureMessage += ", tables/proposals is disabled";
+        }
+
+        // tables/accounts enabled
+        if (response.data.features.tables.accounts == true) {
+          history.hyperion_health_features_tables_accounts_on = true;
+        } else {
+          history.hyperion_health_features_tables_accounts_on = false;
+          errorCounter++;
+          featureMessage += ", tables/accounts is disabled";
+        }
+
+        // tables/voters enabled
+        if (response.data.features.tables.voters == true) {
+          history.hyperion_health_features_tables_voters_on = true;
+        } else {
+          history.hyperion_health_features_tables_voters_on = false;
+          errorCounter++;
+          featureMessage += ", tables/voters is disabled";
+        }
       }
-      pagerMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_health_version_ok,
-          history.hyperion_health_version_ok,
-          "Hyperion version",
-          "provided in /v2/health",
-          "not provided in /v2/health"
-        )
+
+      // index_deltas enabled
+      if (response.data.features.index_deltas == true) {
+        history.hyperion_health_features_index_deltas_on = true;
+      } else {
+        history.hyperion_health_features_index_deltas_on = false;
+        errorCounter++;
+        featureMessage += ", index_deltas is disabled";
+      }
+
+      // index_transfer_memo enabled
+      if (response.data.features.index_transfer_memo == true) {
+        history.hyperion_health_features_index_transfer_memo_on = true;
+      } else {
+        history.hyperion_health_features_index_transfer_memo_on = false;
+        errorCounter++;
+        featureMessage += ", index_transfer_memo is disabled";
+      }
+
+      // index_all_deltas enabled
+      if (response.data.features.index_all_deltas == true) {
+        history.hyperion_health_features_index_all_deltas_on = true;
+      } else {
+        history.hyperion_health_features_index_all_deltas_on = false;
+        errorCounter++;
+        featureMessage += ", index_all_deltas is disabled";
+      }
+
+      // deferred_trx disabled
+      if (response.data.features.deferred_trx == false || !response.data.features.deferred_trx) {
+        history.hyperion_health_features_index_deferred_trx_off = true;
+      } else {
+        history.hyperion_health_features_index_deferred_trx_off = false;
+        errorCounter++;
+        featureMessage += ", deferred_trx is enabled";
+      }
+
+      // failed_trx disabled
+      if (response.data.features.failed_trx == false || !response.data.features.failed_trx) {
+        history.hyperion_health_features_index_failed_trx_off = true;
+      } else {
+        history.hyperion_health_features_index_failed_trx_off = false;
+        errorCounter++;
+        featureMessage += ", failed_trx is enabled";
+      }
+
+      // resource_limits disabled
+      if (response.data.features.resource_limits == false || !response.data.features.resource_limits) {
+        history.hyperion_health_features_resource_limits_off = true;
+      } else {
+        history.hyperion_health_features_resource_limits_off = false;
+        errorCounter++;
+        featureMessage += ", resource_limits is enabled";
+      }
+
+      // resource_usage disabled
+      if (response.data.features.resource_usage == false || response.data.features.resource_usage) {
+        history.hyperion_health_features_resource_usage_off = true;
+      } else {
+        history.hyperion_health_features_resource_usage_off = false;
+        errorCounter++;
+        featureMessage += ", resource_usage is enabled";
+      }
+
+      history.hyperion_health_all_features_ok = errorCounter == 0;
+    }
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.hyperion_health_all_features_ok,
+        history.hyperion_health_all_features_ok,
+        "Hyperion features",
+        "ok",
+        "not ok" + featureMessage
+      )
+    );
+
+    /**
+     * Test 2.1.5 Health of Services
+     */
+    if (response.data.health && Array.isArray(response.data.health)) {
+      childLogger.debug("FALSE \t Hyperion Health is missing field Health");
+    } else {
+      // NodeosRPC
+      const nodeosRpc = response.data.health.find((x) => x.service === "NodeosRPC");
+      history.hyperion_health_nodeosrpc_ok =
+        nodeosRpc &&
+        nodeosRpc.status === "OK" &&
+        nodeosRpc.service_data &&
+        nodeosRpc.service_data.time_offset >= -500 &&
+        nodeosRpc.service_data.time_offset <= 2000;
+
+      // RabbitMq
+      history.hyperion_health_rabbitmq_ok = response.data.health.find(
+        (x) => x.service === "RabbitMq" && x.status === "OK"
       );
 
-      // Test 2.1.2 Health Host
-      if (response.data.host) {
-        childLogger.debug("TRUE \t Hyperion Host provided");
-        history.hyperion_health_host_ok = true;
-      } else {
-        childLogger.debug("FALSE \t Hyperion Host not provided");
-        history.hyperion_health_host_ok = false;
-      }
-      pagerMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_health_host_ok,
-          history.hyperion_health_host_ok,
-          "Hyperion host",
-          "provided in /v2/health",
-          "not provided in /v2/health"
-        )
-      );
+      // Elastic
+      const elastic = response.data.health.find((x) => x.service === "Elasticsearch");
+      history.hyperion_health_elastic_ok =
+        elastic && elastic.status === "OK" && elastic.service_data && elastic.service_data.active_shards === "100.0%";
 
-      // Test 2.1.3 Query Time
-      if (
-        response.data.query_time_ms &&
-        response.data.query_time_ms < config.get("validation.hyperion_query_time_ms")
-      ) {
-        childLogger.debug("TRUE \t Query time ok provided");
-        history.hyperion_health_query_time_ok = true;
-        history.hyperion_health_query_time_ms = Math.round(response.data.query_time_ms);
-      } else {
-        childLogger.debug("FALSE \t Query time not provided or too slow");
-        history.hyperion_health_query_time_ok = false;
-      }
-      pagerMessages.push(
-        evaluateMessage(
-          lastValidation.history_key_accounts_ok,
-          history.history_key_accounts_ok,
-          "Hyperion query time",
-          "ok",
-          "not ok"
-        )
-      );
+      // Elastic - Total indexed blocks
+      history.hyperion_health_total_indexed_blocks_ok =
+        elastic &&
+        elastic.service_data &&
+        elastic.service_data.last_indexed_block == elastic.service_data.total_indexed_blocks;
+    }
+  });
 
-      /**
-       * Test 2.1.4 Features
-       */
-      let featureMessage = "";
-      if (!response.data.features) {
-        childLogger.debug("FALSE \t Hyperion Health is missing field Features");
-        history.hyperion_health_all_features_ok = false;
-      } else {
-        let errorCounter = 0;
-        // tables
-        if (!response.data.features.tables) {
-          childLogger.debug("FALSE \t Hyperion Health is missing field Features.Tables");
-        } else {
-          // tables/proposals enabled
-          if (response.data.features.tables.proposals == true) {
-            childLogger.debug("*** TRUE *** tables/proposals is enabled");
-            history.hyperion_health_features_tables_proposals_on = true;
-          } else {
-            childLogger.debug("*** FALSE *** tables/proposals is disabled");
-            history.hyperion_health_features_tables_proposals_on = false;
-            errorCounter++;
-            featureMessage += ", tables/proposals is disabled";
-          }
-
-          // tables/accounts enabled
-          if (response.data.features.tables.accounts == true) {
-            childLogger.debug("*** TRUE *** tables/accounts is enabled");
-            history.hyperion_health_features_tables_accounts_on = true;
-          } else {
-            childLogger.debug("*** FALSE *** tables/accounts is disabled");
-            history.hyperion_health_features_tables_accounts_on = false;
-            errorCounter++;
-            featureMessage += ", tables/accounts is disabled";
-          }
-
-          // tables/voters enabled
-          if (response.data.features.tables.voters == true) {
-            childLogger.debug("*** TRUE *** tables/voters is enabled");
-            history.hyperion_health_features_tables_voters_on = true;
-          } else {
-            childLogger.debug("*** FALSE *** tables/voters is disabled");
-            history.hyperion_health_features_tables_voters_on = false;
-            errorCounter++;
-            featureMessage += ", tables/voters is disabled";
-          }
-        }
-
-        // index_deltas enabled
-        if (response.data.features.index_deltas == true) {
-          childLogger.debug("*** TRUE *** index_deltas is enabled");
-          history.hyperion_health_features_index_deltas_on = true;
-        } else {
-          childLogger.debug("*** FALSE *** index_deltas is disabled");
-          history.hyperion_health_features_index_deltas_on = false;
-          errorCounter++;
-          featureMessage += ", index_deltas is disabled";
-        }
-
-        // index_transfer_memo enabled
-        if (response.data.features.index_transfer_memo == true) {
-          childLogger.debug("*** TRUE *** index_transfer_memo is enabled");
-          history.hyperion_health_features_index_transfer_memo_on = true;
-        } else {
-          childLogger.debug("*** FALSE *** index_transfer_memo is disabled");
-          history.hyperion_health_features_index_transfer_memo_on = false;
-          errorCounter++;
-          featureMessage += ", index_transfer_memo is disabled";
-        }
-
-        // index_all_deltas enabled
-        if (response.data.features.index_all_deltas == true) {
-          childLogger.debug("*** TRUE *** index_all_deltas is enabled");
-          history.hyperion_health_features_index_all_deltas_on = true;
-        } else {
-          childLogger.debug("*** FALSE *** index_all_deltas is disabled");
-          history.hyperion_health_features_index_all_deltas_on = false;
-          errorCounter++;
-          featureMessage += ", index_all_deltas is disabled";
-        }
-
-        // deferred_trx disabled
-        if (response.data.features.deferred_trx == false || !response.data.features.deferred_trx) {
-          childLogger.debug("*** TRUE *** deferred_trx is disabled");
-          history.hyperion_health_features_index_deferred_trx_off = true;
-        } else {
-          childLogger.debug("*** FALSE *** deferred_trx is enabled");
-          history.hyperion_health_features_index_deferred_trx_off = false;
-          errorCounter++;
-          featureMessage += ", deferred_trx is enabled";
-        }
-
-        // failed_trx disabled
-        if (response.data.features.failed_trx == false || !response.data.features.failed_trx) {
-          childLogger.debug("*** TRUE *** failed_trx is disabled");
-          history.hyperion_health_features_index_failed_trx_off = true;
-        } else {
-          childLogger.debug("*** FALSE *** failed_trx is enabled");
-          history.hyperion_health_features_index_failed_trx_off = false;
-          errorCounter++;
-          featureMessage += ", failed_trx is enabled";
-        }
-
-        // resource_limits disabled
-        if (response.data.features.resource_limits == false || !response.data.features.resource_limits) {
-          childLogger.debug("*** TRUE *** resource_limits is disabled");
-          history.hyperion_health_features_resource_limits_off = true;
-        } else {
-          childLogger.debug("*** FALSE *** resource_limits is enabled");
-          history.hyperion_health_features_resource_limits_off = false;
-          errorCounter++;
-          featureMessage += ", resource_limits is enabled";
-        }
-
-        // resource_usage disabled
-        if (response.data.features.resource_usage == false || response.data.features.resource_usage) {
-          childLogger.debug("*** TRUE *** resource_usage is disabled");
-          history.hyperion_health_features_resource_usage_off = true;
-        } else {
-          childLogger.debug("*** FALSE *** resource_usage is enabled");
-          history.hyperion_health_features_resource_usage_off = false;
-          errorCounter++;
-          featureMessage += ", resource_usage is enabled";
-        }
-
-        history.hyperion_health_all_features_ok = errorCounter == 0;
-      }
-      pagerMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_health_all_features_ok,
-          history.hyperion_health_all_features_ok,
-          "Hyperion features",
-          "ok",
-          "not ok" + featureMessage
-        )
-      );
-
-      /**
-       * Test 2.1.5 Health of Services
-       */
-      if (!response.data.health || !Array.isArray(response.data.health)) {
-        childLogger.debug("FALSE \t Hyperion Health is missing field Health");
-      } else {
-        // NodeosRPC
-        const nodeosRpc = response.data.health.find((x) => x.service === "NodeosRPC");
-        if (nodeosRpc && nodeosRpc.status === "OK") {
-          childLogger.debug("TRUE \t Hyperion nodeosRpc healthy");
-        } else {
-          childLogger.debug("FALSE \t Hyperion nodeosRpc not healthy. Status in /v2/health should be OK");
-        }
-        if (
-          nodeosRpc &&
-          nodeosRpc.service_data &&
-          nodeosRpc.service_data.time_offset >= -500 &&
-          nodeosRpc.service_data.time_offset <= 2000
-        ) {
-          childLogger.debug("TRUE \t Hyperion Time offset healthy");
-        } else {
-          childLogger.debug("FALSE \t Hyperion Time offset not configured correctly");
-        }
-
-        // RabbitMq
-        if (response.data.health.find((x) => x.service === "RabbitMq" && x.status === "OK")) {
-          childLogger.debug("TRUE \t Hyperion RabbitMq healthy");
-        } else {
-          childLogger.debug("FALSE \t Hyperion RabbitMq not healthy. Status in /v2/health should be OK");
-        }
-
-        // Elastic
-        const elastic = response.data.health.find((x) => x.service === "Elasticsearch");
-        if (elastic && elastic.status === "OK") {
-          childLogger.debug("TRUE \t Hyperion elasticsearch healthy");
-        } else {
-          childLogger.debug("FALSE \t Hyperion elasticsearch not healthy. Status in /v2/health should be OK");
-        }
-
-        // Elastic - Active Shards
-        if (elastic && elastic.service_data && elastic.service_data.active_shards === "100.0%") {
-          childLogger.debug("TRUE \t Hyperion elasticsearch active shards 100%");
-        } else {
-          childLogger.debug("FALSE \t Hyperion elasticsearch active shards not 100%");
-        }
-
-        // Elastic - Total indexed blocks
-        if (
-          elastic &&
-          elastic.service_data &&
-          elastic.service_data.last_indexed_block == elastic.service_data.total_indexed_blocks
-        ) {
-          childLogger.debug("TRUE \t Hyperion last indexed block == total indexed block");
-        } else {
-          childLogger.debug("FALSE \t Hyperion Last indexed block != total indexed block");
-        }
-      }
-    })
-    .catch((error) => {
-      childLogger.debug("*** FALSE *** Health not reachable");
-    });
-
+  // todo: add paermessages
   /**
    * Test 2.2 Hyperion get_transaction
    */
-  let hyperionTransactionMessage = "";
-  await HttpRequest.get(
-    apiEndpoint,
-    "/v2/history/get_transaction?id=" + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction")
-  )
-    .then((response) => {
-      childLogger.debug("TRUE \t Hyperion transaction test passed");
-      history.hyperion_transaction_ok = true;
-      history.hyperion_transaction_ms = response.elapsedTimeInMilliseconds;
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t Hyperion transaction test not passed");
-      history.hyperion_transaction_ok = false;
-      hyperionTransactionMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.hyperion_transaction_ok,
-      history.hyperion_transaction_ok,
-      "Hyperion get_transaction test",
-      "passed",
-      "not passed" + hyperionTransactionMessage
+  await http
+    .request(
+      apiEndpoint,
+      "/v2/history/get_transaction?id=" + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction")
     )
-  );
+    .then((response) => {
+      history.hyperion_transaction_ok = response.isOk;
+      history.hyperion_transaction_ms = response.elapsedTimeInMilliseconds;
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.hyperion_transaction_ok,
+          history.hyperion_transaction_ok,
+          "Hyperion get_transaction test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
+    });
 
   /**
    * Test 2.3 Hyperion get_actions
    */
-  let hyperionActionsMessage = "";
-  await HttpRequest.get(apiEndpoint, "/v2/history/get_actions?limit=1")
-    .then((response) => {
-      history.hyperion_actions_ms = response.elapsedTimeInMilliseconds;
+  await http.request(apiEndpoint, "/v2/history/get_actions?limit=1").then((response) => {
+    let hyperionActionsIncorrectMessage = "";
 
-      if (
-        !(
-          Array.isArray(response.data.actions) &&
-          response.data.actions.length == 1 &&
-          response.data.actions[0]["@timestamp"]
-        )
-      ) {
-        childLogger.debug("FALSE \t block_time missing in last action");
-        hyperionActionsMessage = ", block_time not provided";
-      } else {
-        let currentDate: number = Date.now();
+    history.hyperion_actions_ms = response.elapsedTimeInMilliseconds;
 
-        // Use time of http request if available in order to avoid server or validation time delay
-        if (response.headers.date) {
-          currentDate = new Date(response.headers.date).getTime();
-        }
-        // "+00:00" is necessary for defining date as UTC
-        const timeDelta: number = currentDate - new Date(response.data.actions[0]["@timestamp"] + "+00:00").getTime();
-
-        if (Math.abs(timeDelta) < 300000) {
-          history.hyperion_actions_ok = true;
-          childLogger.debug("TRUE \t Hyperion up-to-date");
-        } else {
-          childLogger.debug("FALSE \t Hyperion not up-to-date: last action is older than 5min");
-          history.hyperion_actions_ok = false;
-          hyperionActionsMessage += ", action is older than 5min";
-        }
-      }
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t Hyperion not up-to-date: last action is older than 5min");
+    if (!response.isOk) {
+      hyperionActionsIncorrectMessage = response.getFormattedErrorMessage();
       history.hyperion_actions_ok = false;
-      hyperionActionsMessage = error.message ? ": " + error.message : "";
-    });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.hyperion_actions_ok,
-      history.hyperion_actions_ok,
-      "Hyperion get_actions test",
-      "passed",
-      "not passed" + hyperionActionsMessage
-    )
-  );
+    }
+
+    // block_time missing in last action
+    else if (
+      !(
+        Array.isArray(response.data.actions) &&
+        response.data.actions.length == 1 &&
+        response.data.actions[0]["@timestamp"]
+      )
+    ) {
+      hyperionActionsIncorrectMessage = ", block_time not provided";
+      history.hyperion_actions_ok = false;
+    } else {
+      let currentDate: number = Date.now();
+
+      // Use time of http request if available in order to avoid server or validation time delay
+      if (response.headers.date) {
+        currentDate = new Date(response.headers.date).getTime();
+      }
+      // "+00:00" is necessary for defining date as UTC
+      const timeDelta: number = currentDate - new Date(response.data.actions[0]["@timestamp"] + "+00:00").getTime();
+
+      // Hyperion up-to-date
+      if (Math.abs(timeDelta) < 300000) {
+        history.hyperion_actions_ok = true;
+      } else {
+        // Hyperion not up-to-date: last action is older than 5min
+        history.hyperion_actions_ok = false;
+        hyperionActionsIncorrectMessage += ", action is older than 5min";
+      }
+    }
+
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.hyperion_actions_ok,
+        history.hyperion_actions_ok,
+        "Hyperion get_actions test",
+        "passed",
+        "not passed" + hyperionActionsIncorrectMessage
+      )
+    );
+  });
 
   /**
    * Test 2.4 Hyperion get_key_accounts
    */
-  let hyperionKeyMessage = "";
-  await HttpRequest.post(
-    apiEndpoint,
-    "/v2/state/get_key_accounts",
-    '{"public_key": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"}'
-  )
+  await http
+    .request(
+      apiEndpoint,
+      "/v2/state/get_key_accounts",
+      '{"public_key": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"}'
+    )
     .then((response) => {
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
-      if (response.data["account_names"]) {
-        childLogger.debug("TRUE \t key account test passed");
-        history.hyperion_key_accounts_ok = true;
-      } else {
-        childLogger.debug("FALSE \t key account test passed");
-        history.hyperion_key_accounts_ok = false;
-      }
-    })
-    .catch((error) => {
-      childLogger.debug("FALSE \t key account test passed");
-      history.hyperion_key_accounts_ok = false;
-      hyperionKeyMessage = error.message ? ": " + error.message : "";
+      history.hyperion_key_accounts_ok = response.isOk && response.isJson() && response.data["account_names"];
+
+      pagerMessages.push(
+        evaluateMessage(
+          lastValidation.hyperion_key_accounts_ok,
+          history.hyperion_key_accounts_ok,
+          "Hyperion get_key_accounts test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
     });
-  pagerMessages.push(
-    evaluateMessage(
-      lastValidation.hyperion_key_accounts_ok,
-      history.hyperion_key_accounts_ok,
-      "Hyperion get_key_accounts test",
-      "passed",
-      "not passed" + hyperionKeyMessage
-    )
-  );
+
+  /**
+   * Check total health of history
+   */
+  history.hyperion_all_checks_ok =
+    history.hyperion_health_version_ok &&
+    history.hyperion_health_host_ok &&
+    history.hyperion_health_query_time_ok &&
+    history.hyperion_health_features_tables_proposals_on &&
+    history.hyperion_health_features_tables_accounts_on &&
+    history.hyperion_health_features_tables_voters_on &&
+    history.hyperion_health_features_index_deltas_on &&
+    history.hyperion_health_features_index_transfer_memo_on &&
+    history.hyperion_health_features_index_all_deltas_on &&
+    history.hyperion_health_features_index_failed_trx_off &&
+    history.hyperion_health_features_index_deferred_trx_off &&
+    history.hyperion_health_features_resource_limits_off &&
+    history.hyperion_health_features_resource_usage_off &&
+    history.hyperion_health_all_features_ok &&
+    history.hyperion_health_elastic_ok &&
+    history.hyperion_health_rabbitmq_ok &&
+    history.hyperion_health_nodeosrpc_ok &&
+    history.hyperion_health_total_indexed_blocks_ok &&
+    history.hyperion_health_active_shards_ok &&
+    history.hyperion_transaction_ok &&
+    history.hyperion_actions_ok &&
+    history.hyperion_key_accounts_ok;
 
   /**
    * Store results in Database
