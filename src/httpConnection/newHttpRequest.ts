@@ -70,6 +70,14 @@ export async function request(
         response.parseFetchError(e);
       });
   }
+
+  // Return request if successful
+  if (response.isOk || retryCounter <= 0) {
+    return response;
+  } else {
+    // Retry request if not successful
+    return request(base, path, payloadAsJson, --retryCounter, contentType);
+  }
 }
 
 /**
