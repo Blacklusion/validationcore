@@ -404,7 +404,7 @@ export async function validateAll(
       '{"json": true, "keys": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"]}'
     )
     .then((response) => {
-      api.wallet_keys_ok = response.isOk && response.isJson;
+      api.wallet_keys_ok = response.isOk && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(
