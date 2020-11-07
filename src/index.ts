@@ -12,8 +12,15 @@ import { JsonRpc } from "eosjs";
  *  - Initialization of interval based validation
  */
 function main() {
-  logger.info("Starting up " + config.get("general.name") + "...");
+  console.log(" _    __      ___     __      __  _                                          ___ \n" +
+    "| |  / /___ _/ (_)___/ /___ _/ /_(_)___  ____  _________  ________     _   _|__ \\\n" +
+    "| | / / __ `/ / / __  / __ `/ __/ / __ \\/ __ \\/ ___/ __ \\/ ___/ _ \\   | | / /_/ /\n" +
+    "| |/ / /_/ / / / /_/ / /_/ / /_/ / /_/ / / / / /__/ /_/ / /  /  __/   | |/ / __/ \n" +
+    "|___/\\__,_/_/_/\\__,_/\\__,_/\\__/_/\\____/_/ /_/\\___/\\____/_/   \\___/    |___/____/")
+  console.log("    by Blacklusion - 2020\n\n")
 
+  logger.info("Starting up " + config.get("general.name") + "...");
+  
   // Check if config file with all necessary settings exists
   if (!checkConfig()) {
     logger.fatal("Not all settings were set. Aborting startup...")
@@ -29,6 +36,8 @@ function main() {
   createConnection()
     .then(async (database) => {
       logger.info("Successfully connected to database ");
+
+      logger.info("++++++++  STARTUP COMPLETE  ++++++++\n\n")
 
       /**
        * Initialize interval based validations
