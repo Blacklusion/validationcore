@@ -12,21 +12,32 @@ export class NewHttpResponse {
 
   errorMessage: string;
 
+  httpCode: number;
+
   constructor() {
     this.headers = undefined;
     this.data = undefined;
     this.elapsedTimeInMilliseconds = null;
     this.isOk = false;
-    this.errorMessage = ""
+    this.errorMessage = "";
   }
 
   parseFetchResponse(response: Response) {
     this.isOk = response.ok;
+    this.httpCode = response.status;
     this.headers = response.headers;
     this.data = response.body;
+
+    if (!this.isOk) {
+    }
   }
 
+
   parseFetchError(error: Error) {
+
+    console.log("Do nothing")
+
+
 
   }
 

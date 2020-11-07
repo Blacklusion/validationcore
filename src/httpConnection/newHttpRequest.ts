@@ -1,6 +1,6 @@
 import * as fetch from "node-fetch";
 import * as config from "config";
-import { HttpResponse } from "./newHttpResponse";
+import { NewHttpResponse } from "./newHttpResponse";
 
 export async function request(
   base: string,
@@ -8,8 +8,8 @@ export async function request(
   payloadAsJson: string = undefined,
   retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
-): HttpResponse {
-  const response = new HttpResponse();
+): Promise<NewHttpResponse> {
+  const response = new NewHttpResponse();
 
   // Check if base url was provided
   if (!base || base === "") {
@@ -18,7 +18,7 @@ export async function request(
   }
 
   // Combine base and path to url
-  //todo: (optional) check for generic domainnames: google.de etc.
+  // todo: (optional) check for generic domainnames: google.de etc.
   let urlWithPath: URL;
   try {
     urlWithPath = new URL(path, base);
@@ -29,16 +29,20 @@ export async function request(
 
   // Send Request
   if (!payloadAsJson) {
-    await timeout(fetch(urlWithPath, {
-      method: "GET",
-      headers: {
-        "request-startTime": Date.now(),
-      },
-    })).then(fetchResponse => {
-      response.parseFetchResponse(fetchResponse);
-    }).catch(e => {
-      response.parseFetchError(e)
-    });;
+    await timeout(
+      fetch(urlWithPath, {
+        method: "GET",
+        headers: {
+          "request-startTime": Date.now(),
+        },
+      })
+    )
+      .then((fetchResponse) => {
+        response.parseFetchResponse(fetchResponse);
+      })
+      .catch((e) => {
+        response.parseFetchError(e);
+      });
   } else {
     // todo: decide if really necessary
     // todo: check if content type match is necessary
@@ -49,17 +53,21 @@ export async function request(
       return response;
     }
 
-      await timeout(fetch(urlWithPath, {
+    await timeout(
+      fetch(urlWithPath, {
         method: "POST",
         headers: {
           "request-startTime": Date.now(),
           "content-type": contentType,
         },
         data: payloadAsJson,
-      })).then(fetchResponse => {
+      })
+    )
+      .then((fetchResponse) => {
         response.parseFetchResponse(fetchResponse);
-      }).catch(e => {
-        response.parseFetchError(e)
+      })
+      .catch((e) => {
+        response.parseFetchError(e);
       });
   }
 }
