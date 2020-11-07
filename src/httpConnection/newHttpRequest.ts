@@ -1,6 +1,7 @@
 import * as fetch from "node-fetch";
 import * as config from "config";
 import { NewHttpResponse } from "./newHttpResponse";
+import { sleep } from "eosio-protocol";
 
 export async function request(
   base: string,
@@ -76,6 +77,10 @@ export async function request(
     return response;
   } else {
     // Retry request if not successful
+
+    // Sleep in order to avoid potential problems with rate limits
+    await sleep(config.get("validation.request_retry_pause_ms"));
+
     return request(base, path, payloadAsJson, --retryCounter, contentType);
   }
 }
