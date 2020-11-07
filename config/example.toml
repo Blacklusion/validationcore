@@ -63,7 +63,7 @@
     history_actions_block_time_delta = 7200000
     hyperion_query_time_ms = 400
     # Valid social services in bp.json
-    social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium"]
+    social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium", "hive"]
 
 # Database connection configuration
 [database]
