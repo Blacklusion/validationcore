@@ -7,8 +7,9 @@ import { Guild } from "../database/entity/Guild";
 import { Api } from "../database/entity/Api";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
-import { evaluateMessage, sendMessageApi } from "../telegramHandler";
+import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/newHttpRequest";
+import { evaluateMessage } from "../messageHandler";
 
 /**
  * Logger Settings for Api
@@ -417,6 +418,8 @@ export async function validateAll(
       );
     });
 
+  // api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok
+
   /**
    * Set all checks ok
    * (location check is excluded, because a wrong location does not interfere with the function of an Api node
@@ -452,6 +455,27 @@ export async function validateAll(
       api.history_validation = history;
     }
   }
+
+  /**
+   * Validate if supplied features in bp.json are actually supported by Api
+   */
+  features.forEach(feature => {
+    switch (feature) {
+      case "chain-api":
+          // api.chains_feature = api.all_checks_ok
+        break;
+      case "account-query":
+        // api.wallet_feature = api.all_wallet_checks_ok
+        break;
+      case "history-v1":
+
+        break;
+      case "hyperion-v2":
+        break;
+      default:
+        childLogger.debug("Api Feature is not validated by validationcore")
+    }
+  })
 
   /**
    * Store results in Database
