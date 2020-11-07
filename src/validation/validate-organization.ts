@@ -1,4 +1,3 @@
-import * as HttpRequest from "../httpConnection/HttpRequest";
 import * as api from "./validate-api";
 import * as seed from "./validate-seed";
 import * as config from "config";
@@ -24,8 +23,8 @@ const childLogger: Logger = logger.getChildLogger({
 /**
  * Validates regged producer information, chains.json and bp.json for specified guild
  * Only one chain (mainnet or testnet) will be evaluated
- * @param guild
- * @param isMainnet
+ * @param {Guild} guild = guild tracked by database, for which the organization is validated
+ * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  */
 export async function validateAll(guild: Guild, isMainnet: boolean) {
   // Set general variables
@@ -86,7 +85,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
    */
   await http.request(url).then((response) => {
     // Set status in database
-    organization.reg_website_ok = true;
+    organization.reg_website_ok = response.isOk;
     organization.reg_website_ms = response.elapsedTimeInMilliseconds;
 
     // Create Explanation for Pager Messages and locally stored .json
@@ -106,7 +105,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
    * 2. CHAINS.JSON TESTS
    * ====================================================================================
    */
-  let chainsJsonMessage = "";
   await http.request(url, "/chains.json").then(async (response) => {
     /**
      * Test 2.1: Chains.json exists at expected location and is valid Json
@@ -135,8 +133,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
      * Test 2.2: Is access control allow origin header configured
      */
     // todo: check for double headers
+    // Set status in database
     organization.chains_json_access_control_header_ok =
       response.headers["access-control-allow-origin"] && response.headers["access-control-allow-origin"] === "*";
+
+    // Create Explanation for Pager Messages and locally stored .json
     validationMessages.push(
       evaluateMessage(
         lastValidation.chains_json_access_control_header_ok,
@@ -169,6 +170,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
        */
       organization.bpjson_found = response.isOk;
 
+      // bp.json request was unsuccessful
       if (!response.isOk) {
         bpJsonIncorrectMessage = "not reachable" + response.getFormattedErrorMessage();
         return;
@@ -187,18 +189,24 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
        */
       // todo: impove regex to suport max length and only valid characters
       let producerNameMessage = "was not provided";
+      // A valid producer_account_name is provided in bp.json
       if (response.data["producer_account_name"] && new RegExp(".+").test(response.data["producer_account_name"])) {
+        // producer_account_name matches name provided on chain
         if (response.data["producer_account_name"] === guild.name) {
           //todo: check case sensitivity
           organization.bpjson_producer_account_name_ok = true;
+          // producer_account_name does NOT match name provided on chain
         } else {
           organization.bpjson_producer_account_name_ok = false;
           producerNameMessage =
             "(" + response.data["producer_account_name"] + ") does not match name on chain (" + guild.name + ")";
         }
+        // There is no valid producer_account_name in the bp.json
       } else {
         organization.bpjson_producer_account_name_ok = false;
       }
+
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_producer_account_name_ok,
@@ -212,10 +220,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       /**
        * Test 3.2: candidate name
        */
+      // Set status in database
       organization.bpjson_candidate_name_ok =
         orgExists &&
         response.data.org["candidate_name"] !== undefined &&
         new RegExp(".+").test(response.data.org["candidate_name"]);
+
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_candidate_name_ok,
@@ -240,6 +251,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         websiteIncorrectMessage = "is not provided: Org section missing";
       }
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_candidate_name_ok,
@@ -265,6 +277,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         codeOfConductIncorrectMessage = "was not provided: Org section missing";
       }
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_code_of_conduct_ok,
@@ -289,6 +302,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         organization.bpjson_ownership_disclosure_ok = false;
         ownershipDisclosureIncorrectMessage = "was not provided: Org section missing";
       }
+
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_ownership_disclosure_ok,
@@ -303,17 +318,22 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
        * Test 3.6: email
        */
       let emailIncorrectMessage = "";
+      // Valid email field in bp.json
       if (orgExists && response.data.org["email"]) {
+        // Check if email if formatted correctly
         organization.bpjson_email_ok =
           orgExists && response.data.org["email"] && new RegExp(".+@.+\\..+").test(response.data.org["email"]);
 
         if (!organization.bpjson_email_ok)
           emailIncorrectMessage = "has an invalid format: " + response.data.org["email"];
+
+        // No email field is provided in bp.json
       } else {
         organization.bpjson_email_ok = false;
         emailIncorrectMessage = "was not provided";
       }
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_email_ok,
@@ -368,6 +388,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         gitHubUserIncorrectMessage = "was not provided";
       }
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_email_ok,
@@ -390,6 +411,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         }
       }
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_email_ok,
@@ -405,7 +427,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
        */
       // state = true
       let otherResourcesIncorrectMessage = "are invalid: ";
-      if (orgExists && response.data.org["other_resources"]) {
+      if (orgOtherResourcesExists) {
         const resourcesArray = response.data.org["other_resources"];
 
         if (resourcesArray.isArray) {
@@ -426,7 +448,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
           otherResourcesIncorrectMessage = "are not a valid array";
         }
       }
-
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_email_ok,
@@ -497,6 +519,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         organization.bpjson_branding_ok = false;
         brandingIncorrectMessage = "not provided in all three formats";
       }
+
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_branding_ok,
@@ -512,6 +536,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
        */
       organization.bpjson_location_ok = orgLocationExists && validateBpLocation(response.data.org["location"]);
 
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_location_ok,
@@ -546,6 +571,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       } else {
         organization.bpjson_social_ok = false;
       }
+
+      // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
           lastValidation.bpjson_social_ok,
@@ -665,6 +692,9 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
     bpJsonIncorrectMessage = "not provided";
     organization.bpjson_found = false;
   }
+
+  // General status of bp.json
+  // Create Explanation for Pager Messages and locally stored .json
   validationMessages.push(
     evaluateMessage(lastValidation.bpjson_found, organization.bpjson_found, "bp.json", "found", bpJsonIncorrectMessage)
   );
