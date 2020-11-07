@@ -20,7 +20,7 @@ function main() {
   console.log("    by Blacklusion - 2020\n\n")
 
   logger.info("Starting up " + config.get("general.name") + "...");
-  
+
   // Check if config file with all necessary settings exists
   if (!checkConfig()) {
     logger.fatal("Not all settings were set. Aborting startup...")
@@ -34,7 +34,7 @@ function main() {
     logger.info("Pager mode is disabled. No pager messages will be sent.");
 
   createConnection()
-    .then(async (database) => {
+    .then(async () => {
       logger.info("Successfully connected to database ");
 
       logger.info("++++++++  STARTUP COMPLETE  ++++++++\n\n")
