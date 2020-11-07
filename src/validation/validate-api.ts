@@ -459,23 +459,22 @@ export async function validateAll(
   /**
    * Validate if supplied features in bp.json are actually supported by Api
    */
-  features.forEach(feature => {
+  features.forEach((feature) => {
     switch (feature) {
       case "chain-api":
-          // api.chains_feature = api.all_checks_ok
+        // api.chains_feature = api.all_checks_ok
         break;
       case "account-query":
         // api.wallet_feature = api.all_wallet_checks_ok
         break;
       case "history-v1":
-
         break;
       case "hyperion-v2":
         break;
       default:
-        childLogger.debug("Api Feature is not validated by validationcore")
+        childLogger.debug("Api Feature is not validated by validationcore");
     }
-  })
+  });
 
   /**
    * Store results in Database

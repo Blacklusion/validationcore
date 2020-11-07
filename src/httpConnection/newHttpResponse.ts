@@ -32,13 +32,8 @@ export class NewHttpResponse {
     }
   }
 
-
   parseFetchError(error: Error) {
-
-    console.log("Do nothing")
-
-
-
+    console.log("Do nothing");
   }
 
   /**
