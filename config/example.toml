@@ -27,7 +27,7 @@
     [mainnet]
     name = 'wax'
     chain_id = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
-    api_endpoint = 'http://node-wax-mn-api-1:8888'
+    api_endpoint = 'urlhere'
     server_versions = ["v2.0.5wax01", "v2.0.6wax02", "v2.0.7wax01", "v2.0.8wax01"]
     history_test_transaction = 'f383a4de1236fb6bc34f6dda26c5c552deca19844f5d27238de52873828e51c6'
     history_test_public_key = 'EOS77nEvHodDA2yWerxc4rw5WY6cY5j21WB7e76oZYjdRb6DMDN5d'
@@ -39,7 +39,7 @@
     [testnet]
     name = 'wax-testnet'
     chain_id = 'f16b1833c747c43682f4386fca9cbb327929334a762755ebec17f6f23c9b8a12'
-    api_endpoint = 'http://node-wax-tn-api-1:8888'
+    api_endpoint = 'urlhere'
     server_versions = ["v2.0.5wax01", "v2.0.6wax02", "v2.0.7wax01", "v2.0.8wax01"]
     history_test_transaction = '1eadbd3a4db9fab95b3c2ebc8646e48f4b6a50934f6d3565cf4aeee426d9ec56'
     history_test_public_key = 'EOS5jjiP7AQvxV4vqHgSJLVdNxwtogYwhsvACLCA3XDwHWYzMtftY'
