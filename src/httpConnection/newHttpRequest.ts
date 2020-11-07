@@ -73,7 +73,7 @@ export async function request(
   }
 
   // Return request if successful
-  if (response.isOk || retryCounter <= 0) {
+  if (response.ok || retryCounter <= 0) {
     return response;
   } else {
     // Retry request if not successful

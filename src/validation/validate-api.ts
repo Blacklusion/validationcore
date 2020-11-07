@@ -92,7 +92,7 @@ export async function validateAll(
    * 1. Test: Basic Checks
    */
   await http.request(apiEndpoint, "/v1/chain/get_info", '{"json": true}').then((response) => {
-    api.get_info_ok = response.isOk && response.isJson();
+    api.get_info_ok = response.ok && response.isJson();
     api.get_info_ms = response.elapsedTimeInMilliseconds;
 
     pagerMessages.push(
@@ -189,7 +189,7 @@ export async function validateAll(
    * Test 2: Block one exists
    */
   await http.request(apiEndpoint, "/v1/chain/get_block", '{"block_num_or_id": "1", "json": true}').then((response) => {
-    api.block_one_ok = response.isOk && response.isJson();
+    api.block_one_ok = response.ok && response.isJson();
     api.block_one_ms = response.elapsedTimeInMilliseconds;
 
     pagerMessages.push(
@@ -209,7 +209,7 @@ export async function validateAll(
   await http.request(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0).then((response) => {
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
-    api.verbose_error_ok = !response.isOk && Object.keys(response.data.error.details).length != 0;
+    api.verbose_error_ok = !response.ok && Object.keys(response.data.error.details).length != 0;
     pagerMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,
@@ -239,7 +239,7 @@ export async function validateAll(
       .then((response) => {
         api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
         api.abi_serializer_ok =
-          response.isOk &&
+          response.ok &&
           response.data.transactions &&
           Object.keys(response.data.transactions).length ==
             config.get(
@@ -272,7 +272,7 @@ export async function validateAll(
         '"}'
     )
     .then((response) => {
-      api.basic_symbol_ok = response.isOk && Array.isArray(response.data) && response.data.length == 1;
+      api.basic_symbol_ok = response.ok && Array.isArray(response.data) && response.data.length == 1;
       api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(
@@ -380,7 +380,7 @@ export async function validateAll(
       '{"json": true, "accounts": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") + '"]}'
     )
     .then((response) => {
-      api.wallet_accounts_ok = response.isOk && response.isJson();
+      api.wallet_accounts_ok = response.ok && response.isJson();
       api.wallet_accounts_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(
@@ -404,7 +404,7 @@ export async function validateAll(
       '{"json": true, "keys": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"]}'
     )
     .then((response) => {
-      api.wallet_keys_ok = response.isOk && response.isJson();
+      api.wallet_keys_ok = response.ok && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(

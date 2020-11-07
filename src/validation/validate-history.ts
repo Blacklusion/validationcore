@@ -85,7 +85,7 @@ export async function validateAll(
       '{"json": true, "id": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction") + '"}'
     )
     .then((response) => {
-      history.history_transaction_ok = response.isOk && response.isJson();
+      history.history_transaction_ok = response.ok && response.isJson();
       history.history_transaction_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(
@@ -115,7 +115,7 @@ export async function validateAll(
       history.history_actions_ms = response.elapsedTimeInMilliseconds;
       let errorCounter = 0;
 
-      if (!response.isOk || !response.isJson()) {
+      if (!response.ok || !response.isJson()) {
         historyActionsIncorrectMessage = response.getFormattedErrorMessage();
         history.hyperion_actions_ok = false;
         return;
@@ -194,7 +194,7 @@ export async function validateAll(
       history.history_key_accounts_ms = response.elapsedTimeInMilliseconds;
 
       let historyKeyIncorrectMessage = ": invalid response format";
-      if (!response.isOk) {
+      if (!response.ok) {
         historyKeyIncorrectMessage = response.getFormattedErrorMessage();
         history.history_key_accounts_ok = false;
       } else {
@@ -426,7 +426,7 @@ export async function validateAll(
       "/v2/history/get_transaction?id=" + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction")
     )
     .then((response) => {
-      history.hyperion_transaction_ok = response.isOk;
+      history.hyperion_transaction_ok = response.ok;
       history.hyperion_transaction_ms = response.elapsedTimeInMilliseconds;
 
       pagerMessages.push(
@@ -448,7 +448,7 @@ export async function validateAll(
 
     history.hyperion_actions_ms = response.elapsedTimeInMilliseconds;
 
-    if (!response.isOk) {
+    if (!response.ok) {
       hyperionActionsIncorrectMessage = response.getFormattedErrorMessage();
       history.hyperion_actions_ok = false;
     }
@@ -505,7 +505,7 @@ export async function validateAll(
     )
     .then((response) => {
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
-      history.hyperion_key_accounts_ok = response.isOk && response.isJson() && response.data["account_names"];
+      history.hyperion_key_accounts_ok = response.ok && response.isJson() && response.data["account_names"];
 
       pagerMessages.push(
         evaluateMessage(

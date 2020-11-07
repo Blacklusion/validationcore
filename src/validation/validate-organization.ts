@@ -85,7 +85,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
    */
   await http.request(url).then((response) => {
     // Set status in database
-    organization.reg_website_ok = response.isOk;
+    organization.reg_website_ok = response.ok;
     organization.reg_website_ms = response.elapsedTimeInMilliseconds;
 
     // Create Explanation for Pager Messages and locally stored .json
@@ -109,11 +109,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
     /**
      * Test 2.1: Chains.json exists at expected location and is valid Json
      */
-    organization.chains_json_ok = response.isOk;
+    organization.chains_json_ok = response.ok;
     organization.chains_json_ms = response.elapsedTimeInMilliseconds;
 
     let chainsJsonMessage = "not found" + response.getFormattedErrorMessage();
-    if (response.isOk && !response.isJson()) {
+    if (response.ok && !response.isJson()) {
       organization.chains_json_ok = false;
       chainsJsonMessage = "is not a valid json";
     }
@@ -168,10 +168,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       /**
        * Test 3.1: bp.json reachable
        */
-      organization.bpjson_found = response.isOk;
+      organization.bpjson_found = response.ok;
 
       // bp.json request was unsuccessful
-      if (!response.isOk) {
+      if (!response.ok) {
         bpJsonIncorrectMessage = "not reachable" + response.getFormattedErrorMessage();
         return;
       }
@@ -243,7 +243,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       let websiteIncorrectMessage = "";
       if (orgExists) {
         await http.request(response.data.org["website"]).then((response) => {
-          organization.bpjson_website_ok = response.isOk;
+          organization.bpjson_website_ok = response.ok;
           organization.bpjson_website_ms = response.elapsedTimeInMilliseconds;
           websiteIncorrectMessage = "is not reachable" + response.getFormattedErrorMessage();
         });
@@ -268,7 +268,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       let codeOfConductIncorrectMessage = "";
       if (orgExists) {
         await http.request(response.data.org["code_of_conduct"]).then((response) => {
-          organization.bpjson_code_of_conduct_ok = response.isOk;
+          organization.bpjson_code_of_conduct_ok = response.ok;
           organization.bpjson_code_of_conduct_ms = response.elapsedTimeInMilliseconds;
           codeOfConductIncorrectMessage = "is not reachable" + response.getFormattedErrorMessage();
         });
@@ -294,7 +294,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
       let ownershipDisclosureIncorrectMessage = "";
       if (orgExists) {
         await http.request(response.data.org["ownership_disclosure"]).then((response) => {
-          organization.bpjson_ownership_disclosure_ok = response.isOk;
+          organization.bpjson_ownership_disclosure_ok = response.ok;
           organization.bpjson_ownership_disclosure_ms = response.elapsedTimeInMilliseconds;
           ownershipDisclosureIncorrectMessage = "is not reachable" + response.getFormattedErrorMessage();
         });
@@ -468,11 +468,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         // Logo 256px
         await http.request(response.data.org.branding["logo_256"]).then((response) => {
           // Successful request and logo is in right format
-          if (response.isOk && new RegExp("image/(png|jpg]).*").test(response.headers["content-type"])) {
+          if (response.ok && new RegExp("image/(png|jpg]).*").test(response.headers["content-type"])) {
             successfulBrandingRequests++;
           }
           // Successful request but logo is not right format
-          if (response.isOk) {
+          if (response.ok) {
             brandingIncorrectMessage += ", logo_256 (wrong format)";
           }
           // Request was not successful
@@ -484,11 +484,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         // Logo 1024px
         await http.request(response.data.org.branding["logo_1024"]).then((response) => {
           // Successful request and logo is in right format
-          if (response.isOk && new RegExp("image/(png|jpg]).*").test(response.headers["content-type"])) {
+          if (response.ok && new RegExp("image/(png|jpg]).*").test(response.headers["content-type"])) {
             successfulBrandingRequests++;
           }
           // Successful request but logo is not right format
-          if (response.isOk) {
+          if (response.ok) {
             brandingIncorrectMessage += ", logo_1024 (wrong format)";
           }
           // Request was not successful
@@ -500,11 +500,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
         // Logo svg
         await http.request(response.data.org.branding["logo_svg"]).then((response) => {
           // Successful request and logo is in right format
-          if (response.isOk && new RegExp("image/svg.*").test(response.headers["content-type"])) {
+          if (response.ok && new RegExp("image/svg.*").test(response.headers["content-type"])) {
             successfulBrandingRequests++;
           }
           // Successful request but logo is not right format
-          if (response.isOk) {
+          if (response.ok) {
             brandingIncorrectMessage += ", logo_svg (wrong format)";
           }
           // Request was not successful
