@@ -18,6 +18,7 @@
 
 [telegram]
     # Public Blacklusion Pager Telegram service (accessible for the user)
+    # Leave blank if pager_mode is disabled
     public_url = 'urlhere'
 
     # Private Telegram service (used for reporting errors to administrator)

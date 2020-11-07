@@ -14,6 +14,14 @@ import { JsonRpc } from "eosjs";
 function main() {
   logger.info("Starting up " + config.get("general.name") + "...");
 
+  // Check if config file with all necessary settings exists
+  if (!checkConfig()) {
+    logger.fatal("Not all settings were set. Aborting startup...")
+    return;
+  } else {
+    logger.info("Valid config/local.toml was found!")
+  }
+
   // Check if Pager mode is enabled
   if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
     logger.info("Pager mode is disabled. No pager messages will be sent.");
@@ -153,4 +161,68 @@ async function updateGuildTable(isMainnet: boolean) {
   } catch (error) {
     logger.fatal("Error while updating guildTable", error);
   }
+}
+
+/**
+ * Checks if all necessary settings are provided in config/local.toml
+ * @return {boolean} = if true all settings are set correctly. Otherwise false is returned
+ */
+function checkConfig(): boolean {
+  let allVariablesSet = true;
+
+  const settings = [
+    ["general.name", "string"],
+    ["general.pager_mode", "boolean"],
+    // Logging_level must not be provided -> defaults to info
+
+    ["telegram.public_url", "string"],
+    ["telegram.private_url", "string"],
+
+    ["mainnet.name", "string"],
+    ["mainnet.chain_id", "string"],
+    ["mainnet.api_endpoint", "string"],
+    ["mainnet.server_versions", "array"],
+    ["mainnet.history_test_transaction", "string"],
+    ["mainnet.history_test_public_key", "string"],
+    ["mainnet.api_test_big_block", "number"],
+    ["mainnet.api_test_big_bock_transaction_count", "number"],
+    ["mainnet.api_currency_symbol", "string"],
+    ["mainnet.api_test_account", "string"],
+
+    ["testnet.name", "string"],
+    ["testnet.chain_id", "string"],
+    ["testnet.api_endpoint", "string"],
+    ["testnet.server_versions", "array"],
+    ["testnet.history_test_transaction", "string"],
+    ["testnet.history_test_public_key", "string"],
+    ["testnet.api_currency_symbol", "string"],
+    ["testnet.api_test_account", "string"],
+
+    ["validation.request_retry_count", "number"],
+    ["validation.request_retry_pause_ms", "number"],
+    ["validation.request_timeout_ms", "number"],
+    ["validation.producer_limit", "number"],
+    ["validation.p2p_block_count", "number"],
+    ["validation.p2p_ok_speed", "number"],
+    ["validation.api_head_bock_time_delta", "number"],
+    ["validation.history_transaction_offset", "number"],
+    ["validation.history_actions_block_time_delta", "number"],
+    ["validation.hyperion_query_time_ms", "number"],
+    ["validation.social_services", "array"]
+  ];
+
+
+  settings.forEach(setting => {
+    try {
+      if ((setting[1] === "array" && !Array.isArray(config.get(setting[0]))) || (setting[1] !== "array" && !(typeof config.get(setting[0]) === setting[1]))) {
+        logger.error(setting[0] + " was provided. But it is not of type " + setting[1]);
+        allVariablesSet = false;
+      }
+    } catch (e) {
+      logger.error(setting[0] + " was not provided!");
+      allVariablesSet = false;
+    }
+  })
+
+  return allVariablesSet;
 }
