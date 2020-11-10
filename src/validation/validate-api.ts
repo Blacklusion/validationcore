@@ -281,68 +281,71 @@ export async function validateAll(
   /**
    * Test 6: producer api disabled
    */
-  await http.request(apiEndpoint, "/v1/producer/get_integrity_hash", undefined, 0)
-    .then((response) => {
-      // Set status in database
-      api.producer_api_ms = response.elapsedTimeInMilliseconds;
-      api.producer_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+  await http.request(apiEndpoint, "/v1/producer/get_integrity_hash", undefined, 0).then((response) => {
+    // Set status in database
+    api.producer_api_ms = response.elapsedTimeInMilliseconds;
+    api.producer_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
 
-      // Create error message
-      let producerApiIncorrectMessage = "is enabled. This feature should be disabled";
-      if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-        producerApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-      }
+    // Create error message
+    let producerApiIncorrectMessage = "is enabled. This feature should be disabled";
+    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
+      producerApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
+    }
 
-      pagerMessages.push(
-        evaluateMessage(
-          lastValidation.producer_api_off,
-          api.producer_api_off,
-          "Producer api",
-          "is disabled",
-          producerApiIncorrectMessage
-        )
-      );
-    })
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.producer_api_off,
+        api.producer_api_off,
+        "Producer api",
+        "is disabled",
+        producerApiIncorrectMessage
+      )
+    );
+  });
 
   /**
    * Test 7: db_size api disabled
    */
-  await http.request(apiEndpoint, "/v1/db_size/get", undefined,0)
-    .then((response) => {
-      // Set status in database
-      api.db_size_api_ms = response.elapsedTimeInMilliseconds;
-      api.db_size_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+  await http.request(apiEndpoint, "/v1/db_size/get", undefined, 0).then((response) => {
+    // Set status in database
+    api.db_size_api_ms = response.elapsedTimeInMilliseconds;
+    api.db_size_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
 
-      // Create error message
-      let dbSizeIncorrectMessage = "is enabled. This feature should be disabled";
-      if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-        dbSizeIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-      }
+    // Create error message
+    let dbSizeIncorrectMessage = "is enabled. This feature should be disabled";
+    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
+      dbSizeIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
+    }
 
-      pagerMessages.push(
-        evaluateMessage(lastValidation.db_size_api_off, api.db_size_api_off, "Db_size api", "is disabled", dbSizeIncorrectMessage)
-      );
-    })
+    pagerMessages.push(
+      evaluateMessage(
+        lastValidation.db_size_api_off,
+        api.db_size_api_off,
+        "Db_size api",
+        "is disabled",
+        dbSizeIncorrectMessage
+      )
+    );
+  });
 
   /**
    * Test 8: net api disabled
    */
-  await http.request(apiEndpoint, "/v1/net/connections", undefined,0)
-    .then((response) => {
-      // Set status in database
-      api.net_api_ms = response.elapsedTimeInMilliseconds;
-      api.net_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+  await http.request(apiEndpoint, "/v1/net/connections", undefined, 0).then((response) => {
+    // Set status in database
+    api.net_api_ms = response.elapsedTimeInMilliseconds;
+    api.net_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
 
-      // Create error message
-      let netApiIncorrectMessage = "is enabled. This feature should be disabled";
-      if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-        netApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-      }
+    // Create error message
+    let netApiIncorrectMessage = "is enabled. This feature should be disabled";
+    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
+      netApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
+    }
 
-      pagerMessages.push(
-        evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
-      );
-    })
+    pagerMessages.push(
+      evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
+    );
+  });
 
   /**
    * Test 9: Wallet - get_accounts_by_authorizers
