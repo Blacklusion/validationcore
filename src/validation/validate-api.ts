@@ -69,21 +69,14 @@ export async function validateAll(
       api.ssl_ok = false;
       sslMessage = "not ok, no https url provided";
     } else {
-      await HttpRequest.get(apiEndpoint, "", 0)
-        .then((response) => {
+      await http.request(apiEndpoint, "", undefined, 0).then((response) => {
+        if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
           api.ssl_ok = true;
-        })
-        .catch((error) => {
-          if (error.type == HttpErrorType.HTTP) {
-            api.ssl_ok = true;
-          } else if (error.type == HttpErrorType.SSL) {
-            sslMessage = "not ok: " + error.message;
-            api.ssl_ok = false;
-          } else {
-            sslMessage = "could not be validated" + (error.message ? ": " + error.message : "");
-            api.ssl_ok = false;
-          }
-        });
+        } else {
+          api.ssl_ok = false;
+          sslMessage = "not ok: " + response.getFormattedErrorMessage();
+        }
+      });
     }
     pagerMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
   }
