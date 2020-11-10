@@ -1,4 +1,3 @@
-import * as HttpRequest from "../httpConnection/HttpRequest";
 import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
 import * as config from "config";
@@ -8,7 +7,6 @@ import { getConnection } from "typeorm";
 import { evaluateMessage, sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as http from "../httpConnection/newHttpRequest";
-import { readdirSync } from "fs";
 
 /**
  * Logger Settings for History
@@ -63,7 +61,7 @@ export async function validateAll(
     }
     pagerMessages.push(evaluateMessage(lastValidation.ssl_ok, history.ssl_ok, "TLS", "ok", sslMessage));
   }
-  
+
   /**
    * 1. HISTORY
    */
