@@ -25,7 +25,9 @@ export class NewHttpResponse {
   constructor() {
     this.headers = undefined;
     this.data = undefined;
-    this.httpCode = undefined;
+
+    // Set to -1 to prevent checks on undefined
+    this.httpCode = -1;
     this.elapsedTimeInMilliseconds = null;
     this.ok = false;
     this.errorMessage = "";
