@@ -48,7 +48,7 @@ export class NewHttpResponse {
   parseFetchError(error: Error) {
 
     // Error is Timeout Error
-    if (error.message === "Timeout" || (error.code && (error.code === "ETIMEDOUT" || error.code == "ECONNABORTED"))) {
+    if (error.message === "timeout" || (error.code && (error.code === "ETIMEDOUT" || error.code == "ECONNABORTED"))) {
       this.errorMessage = "Timeout during request";
     }
 

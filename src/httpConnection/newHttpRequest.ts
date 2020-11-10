@@ -81,6 +81,7 @@ export async function request(
     // Sleep in order to avoid potential problems with rate limits
     await sleep(config.get("validation.request_retry_pause_ms"));
 
+    // Try again
     return request(base, path, payloadAsJson, --retryCounter, contentType);
   }
 }
@@ -94,7 +95,7 @@ function timeout(promise): Promise<Response> {
   const timeoutMs = config.get("validation.request_timeout_ms");
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      reject(new Error("Timeout"));
+      reject(new Error("timeout"));
     }, timeoutMs);
     promise.then(
       (res) => {
