@@ -201,7 +201,7 @@ export async function validateAll(
   await http.request(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0).then((response) => {
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
-    api.verbose_error_ok = !response.ok && Object.keys(response.data.error.details).length != 0;
+    api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.data.error.details).length != 0;
     pagerMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,
