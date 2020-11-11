@@ -38,8 +38,8 @@ export async function request(
         },
       })
     )
-      .then((fetchResponse) => {
-        response.parseFetchResponse(fetchResponse);
+      .then(async (fetchResponse) => {
+        await response.parseFetchResponse(fetchResponse);
       })
       .catch((e) => {
         response.parseFetchError(e);
@@ -64,8 +64,8 @@ export async function request(
         data: payloadAsJson,
       })
     )
-      .then((fetchResponse) => {
-        response.parseFetchResponse(fetchResponse);
+      .then(async (fetchResponse) => {
+        await response.parseFetchResponse(fetchResponse);
       })
       .catch((e) => {
         response.parseFetchError(e);

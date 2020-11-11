@@ -33,11 +33,11 @@ export class NewHttpResponse {
     this.errorMessage = "";
   }
 
-  parseFetchResponse(response: Response) {
+  async parseFetchResponse(response: Response) {
     this.ok = response.ok;
     this.httpCode = response.status;
     this.headers = response.headers;
-    this.data = response.body;
+    this.data = await response.text();
 
     if (!this.ok) {
       this.errorMessage = response.statusText;
@@ -45,7 +45,7 @@ export class NewHttpResponse {
     }
   }
 
-  parseFetchError(error: Error) {
+  parseFetchError(error: any) {
     // Error is Timeout Error
     if (error.message === "timeout" || (error.code && (error.code === "ETIMEDOUT" || error.code == "ECONNABORTED"))) {
       this.errorMessage = "Timeout during request";
