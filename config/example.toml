@@ -16,6 +16,10 @@
     # Useful for analytic purposes without telegram notifications
     pager_mode = true
 
+    # Directory used to save json files for every guild containing the last validation messages
+    # Can be accessed by other applications or Apis e.g. for the creation of stat websites
+    json_directory = "/jsons/"
+
 [telegram]
     # Public Blacklusion Pager Telegram service (accessible for the user)
     # Leave blank if pager_mode is disabled

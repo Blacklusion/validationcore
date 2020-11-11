@@ -13,6 +13,7 @@ import { Seed } from "../database/entity/Seed";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { evaluateMessage, sendMessageSeed } from "../telegramHandler";
+import { convertArrayToJsonWithHeader } from "../messageHandler";
 
 /**
  * Logger Settings for Organization
@@ -279,12 +280,12 @@ export async function validateAll(
   isMainnet: boolean,
   p2pEndpoint: string,
   locationOk: boolean
-): Promise<Seed> {
+): Promise<[Seed, string]> {
   if (!p2pEndpoint) return undefined;
 
   // Set general variables
   const api: string = isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint");
-  let pagerMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, boolean]> = [];
 
   // Create seed object for database
   const database = getConnection();
@@ -307,7 +308,7 @@ export async function validateAll(
     logger.debug("TRUE \t Valid p2p url");
     seed.p2p_endpoint_address_ok = true;
   }
-  pagerMessages.push(
+  validationMessages.push(
     evaluateMessage(
       lastValidation.p2p_endpoint_address_ok,
       seed.p2p_endpoint_address_ok,
@@ -350,7 +351,7 @@ export async function validateAll(
           logger.debug("FALSE \t Block Transmission Speed too slow");
           seed.block_transmission_speed_ok = false;
         }
-        pagerMessages.push(
+        validationMessages.push(
           evaluateMessage(
             lastValidation.block_transmission_speed_ok,
             seed.block_transmission_speed_ok,
@@ -368,7 +369,7 @@ export async function validateAll(
         );
         seed.p2p_connection_possible = false;
       }
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.p2p_connection_possible,
           seed.p2p_connection_possible,
@@ -401,8 +402,8 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  pagerMessages = pagerMessages.filter((message) => message);
-  if (pagerMessages.length > 0) sendMessageSeed(guild.name, isMainnet, p2pEndpoint, pagerMessages);
+  validationMessages = validationMessages.filter((message) => message);
+  if (validationMessages.length > 0) sendMessageSeed(guild.name, isMainnet, p2pEndpoint, validationMessages);
 
-  return seed;
+  return [seed, convertArrayToJsonWithHeader(p2pEndpoint, validationMessages)];
 }

@@ -8,7 +8,8 @@ import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/newHttpRequest";
-import { evaluateMessage } from "../messageHandler";
+import { evaluateMessage, convertArrayToJsonWithHeader } from "../messageHandler";
+import { isNullOrUndefined } from "util";
 
 /**
  * Logger Settings for Api
@@ -35,7 +36,7 @@ export async function validateAll(
   isSsl: boolean,
   locationOk: boolean,
   features: string[]
-): Promise<Api> {
+): Promise<[Api,string, string]> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -45,7 +46,7 @@ export async function validateAll(
 
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  let pagerMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, boolean]> = [];
 
   // Create api object for database
   const database = getConnection();
@@ -60,7 +61,6 @@ export async function validateAll(
   /**
    * SSL Check
    */
-  // todo
   api.is_ssl = isSsl;
   if (isSsl) {
     let sslMessage = "";
@@ -77,7 +77,7 @@ export async function validateAll(
         }
       });
     }
-    pagerMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
+    validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
   }
 
   /**
@@ -87,7 +87,7 @@ export async function validateAll(
     api.get_info_ok = response.ok && response.isJson();
     api.get_info_ms = response.elapsedTimeInMilliseconds;
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.head_block_delta_ok,
         api.head_block_delta_ok,
@@ -108,7 +108,7 @@ export async function validateAll(
     api.server_version_ok = serverVersions.includes(serverVersion);
     api.server_version = response.data["server_version_string"];
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.server_version_ok,
         api.server_version_ok,
@@ -123,7 +123,7 @@ export async function validateAll(
      */
     api.correct_chain = typeof response.data["chain_id"] == "string" && response.data["chain_id"] === chainId;
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.correct_chain,
         api.correct_chain,
@@ -150,7 +150,7 @@ export async function validateAll(
       const timeDelta: number = currentDate - new Date(response.data["head_block_time"] + "+00:00").getTime();
 
       // Check if headBlock is within the allowed delta
-      api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_bock_time_delta");
+      api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
       api.head_block_delta_ms = timeDelta;
 
       // Format message if head block delta is not within the allowed range
@@ -159,14 +159,14 @@ export async function validateAll(
           ": " +
           timeDelta / 1000 +
           "sec behind. Only a delta of " +
-          config.get("validation.api_head_bock_time_delta") / 1000 +
+          config.get("validation.api_head_block_time_delta") / 1000 +
           "sec is tolerated";
       }
     } else {
       api.head_block_delta_ok = false;
       headBlockIncorrectMessage = ": could not be read from api";
     }
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.head_block_delta_ok,
         api.head_block_delta_ok,
@@ -184,7 +184,7 @@ export async function validateAll(
     api.block_one_ok = response.ok && response.isJson();
     api.block_one_ms = response.elapsedTimeInMilliseconds;
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.block_one_ok,
         api.block_one_ok,
@@ -202,7 +202,7 @@ export async function validateAll(
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
     api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.data.error.details).length != 0;
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,
         api.verbose_error_ok,
@@ -218,7 +218,7 @@ export async function validateAll(
    */
   if (
     config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") &&
-    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_bock_transaction_count")
+    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count")
   ) {
     await http
       .request(
@@ -235,10 +235,10 @@ export async function validateAll(
           response.data.transactions &&
           Object.keys(response.data.transactions).length ==
             config.get(
-              isMainnet ? "mainnet.api_test_big_bock_transaction_count" : "testnet.api_test_big_bock_transaction_count"
+              isMainnet ? "mainnet.api_test_big_block_transaction_count" : "testnet.api_test_big_block_transaction_count"
             );
 
-        pagerMessages.push(
+        validationMessages.push(
           evaluateMessage(
             lastValidation.abi_serializer_ok,
             api.abi_serializer_ok,
@@ -267,7 +267,7 @@ export async function validateAll(
       api.basic_symbol_ok = response.ok && Array.isArray(response.data) && response.data.length == 1;
       api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.basic_symbol_ok,
           api.basic_symbol_ok,
@@ -292,7 +292,7 @@ export async function validateAll(
       producerApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.producer_api_off,
         api.producer_api_off,
@@ -317,7 +317,7 @@ export async function validateAll(
       dbSizeIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.db_size_api_off,
         api.db_size_api_off,
@@ -342,7 +342,7 @@ export async function validateAll(
       netApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
     );
   });
@@ -360,7 +360,7 @@ export async function validateAll(
       api.wallet_accounts_ok = response.ok && response.isJson();
       api.wallet_accounts_ms = response.elapsedTimeInMilliseconds;
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.wallet_accounts_ok,
           api.wallet_accounts_ok,
@@ -384,7 +384,7 @@ export async function validateAll(
       api.wallet_keys_ok = response.ok && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.wallet_keys_ok,
           api.wallet_keys_ok,
@@ -428,8 +428,8 @@ export async function validateAll(
       isSsl
     );
 
-    if (history) {
-      api.history_validation = history;
+    if (Array.isArray(history) && history[0]) {
+      api.history_validation = history[0];
     }
   }
 
@@ -466,8 +466,12 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  pagerMessages = pagerMessages.filter((message) => message);
-  if (pagerMessages.length > 0) sendMessageApi(guild.name, isMainnet, apiEndpoint, pagerMessages);
+  validationMessages = validationMessages.filter((message) => message);
+  if (validationMessages.length > 0) sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
 
-  return api;
+  return [api, convertArrayToJsonWithHeader(
+    apiEndpoint,
+    validationMessages
+  ),
+    ((Array.isArray(history) && history[1]) ? history[1] : undefined)];
 }

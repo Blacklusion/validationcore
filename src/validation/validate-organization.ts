@@ -8,7 +8,7 @@ import { getConnection } from "typeorm";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { sendMessageOrganization } from "../telegramHandler";
-import { evaluateMessage } from "../messageHandler";
+import { evaluateMessage, convertArrayToJsonWithHeader, writeJsonToDisk } from "../messageHandler";
 import { Api } from "../database/entity/Api";
 import { Seed } from "../database/entity/Seed";
 import * as http from "../httpConnection/newHttpRequest";
@@ -34,6 +34,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   // Stores all validation explanations for organization
   let validationMessages: Array<[string, boolean]> = [];
+
+  // After each validation a json with all validation messages is stored to disk
+  let jsonString = '{\n' + '"guild": ' + guild.name + ", "
+  jsonString += '"isMainnet": ' + isMainnet + ", ";
+  const seedJsons: [string] = [];
+  const apiJsons: [string] = [];
+  const historyJsons: [string] = []
 
   // Create organization object for database
   const database = getConnection();
@@ -615,7 +622,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Seed Endpoint
-              const seedNode: Seed = await seed.validateAll(
+              const seedNode: [Seed, string] = await seed.validateAll(
                 guild,
                 lastSeedValidation,
                 isMainnet,
@@ -624,7 +631,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               );
 
               // Add seed validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (seedNode) organization.nodes_seed.push(seedNode);
+              if (Array.isArray(seedNode) && seedNode[0] && seedNode[1]) {
+                // Add relation to seed node to organization database object
+                organization.nodes_seed.push(seedNode[0]);
+
+                // Add seed validation messages to seed json array
+                seedJsons.push(seedNode[1])
+              }
             } else if (node.node_type == "query") {
               /**
                * Test 3.13: Test Api Nodes
@@ -645,7 +658,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Http endpoint
-              const apiNode: Api = await api.validateAll(
+              const apiNode: [Api, string, string] = await api.validateAll(
                 guild,
                 isMainnet,
                 lastApiValidation,
@@ -655,10 +668,19 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 node.features
               );
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (apiNode) organization.nodes_api.push(apiNode);
+              if (Array.isArray(apiNode) && apiNode[0] && apiNode[1] && apiNode[2]) {
+                // Add relation to api node to organization database object
+                organization.nodes_api.push(apiNode[0]);
+
+                // Add api validation messages to api json array
+                apiJsons.push(apiNode[1])
+
+                // Add History validation message to history json array
+                historyJsons.push(apiNode[2])
+              }
 
               // Validate Https endpoint
-              const sslNode: Api = await api.validateAll(
+              const sslNode: [Api, string, string] = await api.validateAll(
                 guild,
                 isMainnet,
                 lastSslValidation,
@@ -669,7 +691,16 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               );
 
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (sslNode) organization.nodes_api.push(sslNode);
+              if (Array.isArray(sslNode) && sslNode[0] && sslNode[1] && sslNode[2]) {
+                // Add relation to ssl api node to organization database object
+                organization.nodes_api.push(sslNode[0]);
+
+                // Add ssl api validation messages to api json array
+                apiJsons.push(sslNode[1])
+
+                // Add History validation message to history json array
+                historyJsons.push(sslNode[2])
+              }
             }
           }
         }
@@ -729,6 +760,15 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
    */
   validationMessages = validationMessages.filter((message) => message);
   if (validationMessages.length > 0) sendMessageOrganization(guild.name, isMainnet, validationMessages);
+
+
+  jsonString += convertArrayToJsonWithHeader("organization", validationMessages);
+  jsonString += ',\n"api_nodes": [' + apiJsons.join(",\n") + "]";
+  jsonString += ',\n"history_nodes": [' + historyJsons.join(",\n") + "]"
+  jsonString += ',\n"seed_nodes": [' + seedJsons.join(",\n") + "]"
+  jsonString += "}";
+
+  await writeJsonToDisk(guild.name, isMainnet, jsonString);
 
   return Promise.resolve(true);
 }

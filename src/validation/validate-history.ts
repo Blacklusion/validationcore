@@ -4,9 +4,10 @@ import * as config from "config";
 import { Logger } from "tslog";
 import { History } from "../database/entity/History";
 import { getConnection } from "typeorm";
-import { evaluateMessage, sendMessageHistory } from "../telegramHandler";
+import { sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as http from "../httpConnection/newHttpRequest";
+import { evaluateMessage, convertArrayToJsonWithHeader } from "../messageHandler";
 
 /**
  * Logger Settings for History
@@ -17,10 +18,11 @@ const childLogger: Logger = logger.getChildLogger({
 
 /**
  * Performs all validations of the History & Hyperion
- * @param guild
- * @param isMainnet
- * @param lastValidation
- * @param apiEndpoint
+ * @param {Guild} guild
+ * @param {boolean} isMainnet
+ * @param {History} lastValidation
+ * @param {string} apiEndpoint
+ * @param {boolean} isSsl
  */
 export async function validateAll(
   guild: Guild,
@@ -28,10 +30,10 @@ export async function validateAll(
   lastValidation: History,
   apiEndpoint: string,
   isSsl: boolean
-): Promise<History> {
+): Promise<[History, string]> {
   if (!apiEndpoint) return undefined;
 
-  let pagerMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, boolean]> = [];
 
   const database = getConnection();
   const history: History = new History();
@@ -59,7 +61,7 @@ export async function validateAll(
         }
       });
     }
-    pagerMessages.push(evaluateMessage(lastValidation.ssl_ok, history.ssl_ok, "TLS", "ok", sslMessage));
+    validationMessages.push(evaluateMessage(lastValidation.ssl_ok, history.ssl_ok, "TLS", "ok", sslMessage));
   }
 
   /**
@@ -79,7 +81,7 @@ export async function validateAll(
       history.history_transaction_ok = response.ok && response.isJson();
       history.history_transaction_ms = response.elapsedTimeInMilliseconds;
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.history_transaction_ok,
           history.history_transaction_ok,
@@ -160,7 +162,7 @@ export async function validateAll(
       // Status ok if all checks are passed
       history.history_actions_ok = errorCounter == 0;
     });
-  pagerMessages.push(
+  validationMessages.push(
     evaluateMessage(
       lastValidation.history_actions_ok,
       history.history_actions_ok,
@@ -192,7 +194,7 @@ export async function validateAll(
         history.history_key_accounts_ok = response.data["account_names"] && response.isJson;
       }
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.history_key_accounts_ok,
           history.history_key_accounts_ok,
@@ -217,7 +219,7 @@ export async function validateAll(
   await http.request(apiEndpoint, "/v2/health").then((response) => {
     // Test 2.1.1 Health version
     history.hyperion_health_version_ok = response.data.version;
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_health_version_ok,
         history.hyperion_health_version_ok,
@@ -229,7 +231,7 @@ export async function validateAll(
 
     // Test 2.1.2 Health Host
     history.hyperion_health_host_ok = response.data.host;
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_health_host_ok,
         history.hyperion_health_host_ok,
@@ -248,7 +250,7 @@ export async function validateAll(
     history.hyperion_health_query_time_ok =
       response.data.query_time_ms && response.data.query_time_ms < config.get("validation.hyperion_query_time_ms");
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.history_key_accounts_ok,
         history.history_key_accounts_ok,
@@ -364,7 +366,7 @@ export async function validateAll(
 
       history.hyperion_health_all_features_ok = errorCounter == 0;
     }
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_health_all_features_ok,
         history.hyperion_health_all_features_ok,
@@ -420,7 +422,7 @@ export async function validateAll(
       history.hyperion_transaction_ok = response.ok;
       history.hyperion_transaction_ms = response.elapsedTimeInMilliseconds;
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.hyperion_transaction_ok,
           history.hyperion_transaction_ok,
@@ -474,7 +476,7 @@ export async function validateAll(
       }
     }
 
-    pagerMessages.push(
+    validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_actions_ok,
         history.hyperion_actions_ok,
@@ -498,7 +500,7 @@ export async function validateAll(
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
       history.hyperion_key_accounts_ok = response.ok && response.isJson() && response.data["account_names"];
 
-      pagerMessages.push(
+      validationMessages.push(
         evaluateMessage(
           lastValidation.hyperion_key_accounts_ok,
           history.hyperion_key_accounts_ok,
@@ -549,8 +551,8 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  pagerMessages = pagerMessages.filter((message) => message);
-  if (pagerMessages.length > 0) sendMessageHistory(guild.name, isMainnet, apiEndpoint, pagerMessages);
+  validationMessages = validationMessages.filter((message) => message);
+  if (validationMessages.length > 0) sendMessageHistory(guild.name, isMainnet, apiEndpoint, validationMessages);
 
-  return history;
+  return [history, convertArrayToJsonWithHeader(apiEndpoint, validationMessages)];
 }

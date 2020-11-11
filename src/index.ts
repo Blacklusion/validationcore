@@ -197,6 +197,7 @@ function checkConfig(): boolean {
   const settings = [
     ["general.name", "string"],
     ["general.pager_mode", "boolean"],
+    ["general.json_directory", "string"],
     // Logging_level must not be provided -> defaults to info
 
     ["telegram.public_url", "string"],
