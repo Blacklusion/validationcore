@@ -26,7 +26,7 @@ const childLogger: Logger = logger.getChildLogger({
  * @param {Guild} guild = guild tracked by database, for which the organization is validated
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  */
-export async function validateAll(guild: Guild, isMainnet: boolean) {
+export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boolean> {
   // Set general variables
   const url: string = isMainnet ? guild.mainnet_url : guild.testnet_url;
   const chainId: string = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
@@ -729,6 +729,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean) {
    */
   validationMessages = validationMessages.filter((message) => message);
   if (validationMessages.length > 0) sendMessageOrganization(guild.name, isMainnet, validationMessages);
+
+  return Promise.resolve(true);
 }
 
 /**

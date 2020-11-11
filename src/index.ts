@@ -6,6 +6,10 @@ import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
 
+// Increases before every validation round and is only used for better logging outputs
+// Useful if validation rounds take longer than validation interval
+let validationRoundCounter = 0;
+
 /**
  * STARTUP:
  *  - Connection to database
@@ -60,8 +64,11 @@ main();
 async function validateAllGuilds() {
   const database = getConnection();
 
+  // Increase validationRoundCounter and safe local copy to prevent side effects
+  const validationRoundCounterLocal = ++validationRoundCounter;
+
   console.log("\n\n\n");
-  logger.info("STARTING NEW VALIDATION");
+  logger.info("STARTING NEW VALIDATION - " + validationRoundCounterLocal);
 
   /**
    * Update Guildinformation in guildtable
@@ -72,6 +79,7 @@ async function validateAllGuilds() {
   /**
    * Validate every guild in guildTable
    */
+  const validationPromises: Promise<boolean>[] = [];
   await database.manager.find(Guild).then((guilds) => {
     guilds.forEach((guild) => {
       if (!guild) {
@@ -83,17 +91,22 @@ async function validateAllGuilds() {
        * Validate Guild for Mainnet
        */
       if (guild.isMainnet) {
-        validateAll(guild, true);
+        validationPromises.push(validateAll(guild, true));
       }
 
       /**
        * Validate Guild for Testnet
        */
       if (guild.isTestnet) {
-        validateAll(guild, false);
+        validationPromises.push(validateAll(guild, false));
       }
     });
   });
+
+  // Create Log output when all validations are finished
+  Promise.all(validationPromises).then(() => {
+    logger.info("VALIDATION ROUND COMPLETE! - " + validationRoundCounterLocal)
+  })
 }
 
 /**
@@ -127,7 +140,7 @@ async function updateGuildTable(isMainnet: boolean) {
         const guildFromDatabase = await database.manager.findOne(Guild, guild.name);
 
         /**
-         * Mainnet uild tables are updated
+         * Mainnet guild tables are updated
          */
         if (isMainnet) {
           guild.isMainnet = true;
