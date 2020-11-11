@@ -105,8 +105,8 @@ async function validateAllGuilds() {
 
   // Create Log output when all validations are finished
   Promise.all(validationPromises).then(() => {
-    logger.info("VALIDATION ROUND COMPLETE! - " + validationRoundCounterLocal)
-  })
+    logger.info("VALIDATION ROUND COMPLETE! - " + validationRoundCounterLocal);
+  });
 }
 
 /**
@@ -209,7 +209,7 @@ function checkConfig(): boolean {
     ["mainnet.history_test_transaction", "string"],
     ["mainnet.history_test_public_key", "string"],
     ["mainnet.api_test_big_block", "number"],
-    ["mainnet.api_test_big_bock_transaction_count", "number"],
+    ["mainnet.api_test_big_block_transaction_count", "number"],
     ["mainnet.api_currency_symbol", "string"],
     ["mainnet.api_test_account", "string"],
 
@@ -228,7 +228,7 @@ function checkConfig(): boolean {
     ["validation.producer_limit", "number"],
     ["validation.p2p_block_count", "number"],
     ["validation.p2p_ok_speed", "number"],
-    ["validation.api_head_bock_time_delta", "number"],
+    ["validation.api_head_block_time_delta", "number"],
     ["validation.history_transaction_offset", "number"],
     ["validation.history_actions_block_time_delta", "number"],
     ["validation.hyperion_query_time_ms", "number"],
