@@ -18,11 +18,11 @@ const childLogger: Logger = logger.getChildLogger({
 
 /**
  * Performs all validations of the History & Hyperion
- * @param {Guild} guild
- * @param {boolean} isMainnet
- * @param {History} lastValidation
- * @param {string} apiEndpoint
- * @param {boolean} isSsl
+ * @param {Guild} guild = guild for which the History is validated (must be tracked in database)
+ * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
+ * @param {History} lastValidation = last validation of the SAME History Endpoint
+ * @param {string} apiEndpoint = url of the api node (http and https possible)
+ * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
  */
 export async function validateAll(
   guild: Guild,
@@ -191,7 +191,7 @@ export async function validateAll(
         historyKeyIncorrectMessage = response.getFormattedErrorMessage();
         history.history_key_accounts_ok = false;
       } else {
-        history.history_key_accounts_ok = response.data["account_names"] && response.isJson;
+        history.history_key_accounts_ok = response.data["account_names"] && response.isJson();
       }
 
       validationMessages.push(
@@ -409,7 +409,7 @@ export async function validateAll(
     }
   });
 
-  // todo: add paermessages
+  // todo: add validation message
   /**
    * Test 2.2 Hyperion get_transaction
    */

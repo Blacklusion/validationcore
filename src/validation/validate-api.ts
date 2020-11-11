@@ -9,7 +9,6 @@ import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/newHttpRequest";
 import { evaluateMessage, convertArrayToJsonWithHeader } from "../messageHandler";
-import { isNullOrUndefined } from "util";
 
 /**
  * Logger Settings for Api
@@ -22,11 +21,13 @@ const childLogger: Logger = logger.getChildLogger({
 
 /**
  * Performs all validations for an Api-Node
- * @param guild
- * @param isMainnet
- * @param lastValidation
- * @param apiEndpoint = of the api node (http and https possible) that is being tested
- * @param locationOk = states if the location information found in the bp.json is valid
+ * @param {Guild} guild = guild for which the Api is validated (must be tracked in database)
+ * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
+ * @param {Api} lastValidation = last validation of the SAME Api Endpoint
+ * @param {string} apiEndpoint = url of the api node (http and https possible)
+ * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
+ * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ * @param {string[]} features = Array of features supplied in the bp.json, describing which features the Api should support
  */
 export async function validateAll(
   guild: Guild,
@@ -451,7 +452,7 @@ export async function validateAll(
       case "hyperion-v2":
         break;
       default:
-        childLogger.debug("Api Feature is not validated by validationcore");
+        childLogger.debug("Api Feature is not validated by Validationcore");
     }
   });
 

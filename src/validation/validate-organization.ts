@@ -23,7 +23,7 @@ const childLogger: Logger = logger.getChildLogger({
 /**
  * Validates regged producer information, chains.json and bp.json for specified guild
  * Only one chain (mainnet or testnet) will be evaluated
- * @param {Guild} guild = guild tracked by database, for which the organization is validated
+ * @param {Guild} guild = guild for which the organization is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  */
 export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boolean> {
@@ -38,9 +38,9 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   // After each validation a json with all validation messages is stored to disk
   let jsonString = "{\n" + '"guild": ' + guild.name + ", ";
   jsonString += '"isMainnet": ' + isMainnet + ", ";
-  const seedJsons: [string] = [];
-  const apiJsons: [string] = [];
-  const historyJsons: [string] = [];
+  const seedJsons: Array<string> = [];
+  const apiJsons: Array<string> = [];
+  const historyJsons: Array<string> = [];
 
   // Create organization object for database
   const database = getConnection();
@@ -194,13 +194,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.1: Producer account name
        */
-      // todo: impove regex to suport max length and only valid characters
+      // todo: improve regex to support max length and only valid characters
       let producerNameMessage = "was not provided";
       // A valid producer_account_name is provided in bp.json
       if (response.data["producer_account_name"] && new RegExp(".+").test(response.data["producer_account_name"])) {
         // producer_account_name matches name provided on chain
         if (response.data["producer_account_name"] === guild.name) {
-          //todo: check case sensitivity
+          // todo: check case sensitivity
           organization.bpjson_producer_account_name_ok = true;
           // producer_account_name does NOT match name provided on chain
         } else {
@@ -573,7 +573,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             validSocialReferences++;
           }
         }
-        // There must be atleast 4 valid social references
+        // There must be at least 4 valid social references
         organization.bpjson_social_ok = validSocialReferences >= 4;
       } else {
         organization.bpjson_social_ok = false;
@@ -775,7 +775,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 /**
  * Verifies a location field used by the bp.json schema
  * Do NOT use for location verification of on chain producer information
- * @param location = json formatted object in the following schema: "name", "country", "latitude", "longitude"
+ * @param {object} location = json formatted object in the following schema: "name", "country", "latitude", "longitude"
+ * @return {boolean} = is true if all location checks have passed
  */
 function validateBpLocation(location: object): boolean {
   let successfulLocationTests = 0;

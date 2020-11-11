@@ -12,8 +12,8 @@ import { getConnection } from "typeorm";
 import { Seed } from "../database/entity/Seed";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
-import { evaluateMessage, sendMessageSeed } from "../telegramHandler";
-import { convertArrayToJsonWithHeader } from "../messageHandler";
+import { sendMessageSeed } from "../telegramHandler";
+import { convertArrayToJsonWithHeader, evaluateMessage } from "../messageHandler";
 
 /**
  * Logger Settings for Organization
@@ -274,6 +274,14 @@ class BlockTransmissionTestRunner extends TestRunner {
   }
 }
 
+/**
+ *
+ * @param {Guild} guild = guild for which the Seed is validated (must be tracked in database)
+ * @param {Seed} lastValidation = last validation of the SAME P2P Endpoint
+ * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
+ * @param {string} p2pEndpoint = url of the p2p endpoint
+ * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ */
 export async function validateAll(
   guild: Guild,
   lastValidation: Seed,
