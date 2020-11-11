@@ -36,7 +36,7 @@ export async function validateAll(
   isSsl: boolean,
   locationOk: boolean,
   features: string[]
-): Promise<[Api,string, string]> {
+): Promise<[Api, string, string]> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -235,7 +235,9 @@ export async function validateAll(
           response.data.transactions &&
           Object.keys(response.data.transactions).length ==
             config.get(
-              isMainnet ? "mainnet.api_test_big_block_transaction_count" : "testnet.api_test_big_block_transaction_count"
+              isMainnet
+                ? "mainnet.api_test_big_block_transaction_count"
+                : "testnet.api_test_big_block_transaction_count"
             );
 
         validationMessages.push(
@@ -469,9 +471,9 @@ export async function validateAll(
   validationMessages = validationMessages.filter((message) => message);
   if (validationMessages.length > 0) sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
 
-  return [api, convertArrayToJsonWithHeader(
-    apiEndpoint,
-    validationMessages
-  ),
-    ((Array.isArray(history) && history[1]) ? history[1] : undefined)];
+  return [
+    api,
+    convertArrayToJsonWithHeader(apiEndpoint, validationMessages),
+    Array.isArray(history) && history[1] ? history[1] : undefined,
+  ];
 }

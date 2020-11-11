@@ -36,11 +36,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   let validationMessages: Array<[string, boolean]> = [];
 
   // After each validation a json with all validation messages is stored to disk
-  let jsonString = '{\n' + '"guild": ' + guild.name + ", "
+  let jsonString = "{\n" + '"guild": ' + guild.name + ", ";
   jsonString += '"isMainnet": ' + isMainnet + ", ";
   const seedJsons: [string] = [];
   const apiJsons: [string] = [];
-  const historyJsons: [string] = []
+  const historyJsons: [string] = [];
 
   // Create organization object for database
   const database = getConnection();
@@ -636,7 +636,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 organization.nodes_seed.push(seedNode[0]);
 
                 // Add seed validation messages to seed json array
-                seedJsons.push(seedNode[1])
+                seedJsons.push(seedNode[1]);
               }
             } else if (node.node_type == "query") {
               /**
@@ -673,10 +673,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 organization.nodes_api.push(apiNode[0]);
 
                 // Add api validation messages to api json array
-                apiJsons.push(apiNode[1])
+                apiJsons.push(apiNode[1]);
 
                 // Add History validation message to history json array
-                historyJsons.push(apiNode[2])
+                historyJsons.push(apiNode[2]);
               }
 
               // Validate Https endpoint
@@ -696,10 +696,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 organization.nodes_api.push(sslNode[0]);
 
                 // Add ssl api validation messages to api json array
-                apiJsons.push(sslNode[1])
+                apiJsons.push(sslNode[1]);
 
                 // Add History validation message to history json array
-                historyJsons.push(sslNode[2])
+                historyJsons.push(sslNode[2]);
               }
             }
           }
@@ -761,11 +761,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   validationMessages = validationMessages.filter((message) => message);
   if (validationMessages.length > 0) sendMessageOrganization(guild.name, isMainnet, validationMessages);
 
-
   jsonString += convertArrayToJsonWithHeader("organization", validationMessages);
   jsonString += ',\n"api_nodes": [' + apiJsons.join(",\n") + "]";
-  jsonString += ',\n"history_nodes": [' + historyJsons.join(",\n") + "]"
-  jsonString += ',\n"seed_nodes": [' + seedJsons.join(",\n") + "]"
+  jsonString += ',\n"history_nodes": [' + historyJsons.join(",\n") + "]";
+  jsonString += ',\n"seed_nodes": [' + seedJsons.join(",\n") + "]";
   jsonString += "}";
 
   await writeJsonToDisk(guild.name, isMainnet, jsonString);

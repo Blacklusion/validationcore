@@ -1,5 +1,5 @@
 import { logger } from "./common";
-import * as fs from "fs"
+import * as fs from "fs";
 import * as config from "config";
 
 export function evaluateMessage(
@@ -39,20 +39,18 @@ export function convertArrayToJson(array: [string, boolean][]): any {
 }
 
 export function convertArrayToJsonWithHeader(header: string, array: [string, boolean][]) {
-
   let jsonString = '"' + header + '": ';
   jsonString += convertArrayToJson(array);
   return jsonString;
 }
 
 export async function writeJsonToDisk(guild: string, isMainnet: boolean, json: string) {
-
   // Create filename with path
-  const fileName = config.get("general.json_directory") +  guild + "_" + (isMainnet ? "main" : "test") + ".json";
+  const fileName = config.get("general.json_directory") + guild + "_" + (isMainnet ? "main" : "test") + ".json";
 
   // Write file to disk
   try {
-    await fs.writeFileSync(fileName, json)
+    await fs.writeFileSync(fileName, json);
   } catch (error) {
     logger.error("Error while saving " + fileName, error);
   }
