@@ -1,12 +1,16 @@
 import { HttpErrorType } from "./HttpErrorType";
 import { logger } from "../common";
+import { readdirSync } from "fs";
 
 export class NewHttpResponse {
   // Header of HttpResponse
-  headers: any;
+  headers: Headers;
 
-  // Data/Body of HttpResponse
-  data: any;
+  // Data/Body of HttpResponse stored as normal "string"
+  data: string;
+
+  // Data/Body of HttpResponse stored as Json Object
+  dataJson: any
 
   // ElapsedTime between the request was send and the response was received
   elapsedTimeInMilliseconds: number;
@@ -28,20 +32,33 @@ export class NewHttpResponse {
 
     // Set to -1 to prevent checks on undefined
     this.httpCode = -1;
-    this.elapsedTimeInMilliseconds = null;
+    this.elapsedTimeInMilliseconds = -1;
     this.ok = false;
     this.errorMessage = "";
   }
 
-  async parseFetchResponse(response: Response) {
+  async parseFetchResponse(response: Response, startTime: number) {
     this.ok = response.ok;
     this.httpCode = response.status;
     this.headers = response.headers;
     this.data = await response.text();
 
+    // Check if Request was successful
     if (!this.ok) {
       this.errorMessage = response.statusText;
       this.errorType = HttpErrorType.HTTP;
+    }
+
+    // Calculate ElapsedTime
+    if (startTime !== undefined) {
+      this.elapsedTimeInMilliseconds = Date.now() - startTime;
+    }
+
+    // Parse body to json if possible
+    try {
+      this.dataJson = JSON.parse(this.data);
+    } catch (e) {
+      this.dataJson = undefined;
     }
   }
 
@@ -78,22 +95,44 @@ export class NewHttpResponse {
 
   /**
    * Checks if body can be parsed into a valid JSON
+   * @return {boolean} = is true if response as valid json as body
    */
-  public isJson(): boolean {
-    try {
-      JSON.parse(this.data);
-      return true;
-    } catch (e) {
-      return false;
-    }
+  isJson(): boolean {
+    return this.dataJson !== undefined;
   }
 
+  /**
+   * Overwrites Error Message of Response
+   * @param {string} message = new Error message
+   * @return {void}
+   */
   setErrorMessage(message: string) {
     this.errorMessage = message;
   }
 
-  getFormattedErrorMessage() {
+  /**
+   * Returns either an empty string or the error message with leading ": "
+   * Useful for formatting error messages or validation messages, in which the ": " shall only be added if an error message exists
+   * @return {string} = Formatted Error message or empty string
+   */
+  getFormattedErrorMessage(): string {
     if (!this.errorMessage || this.errorMessage === "") return "";
     else return ": " + this.errorMessage;
+  }
+
+  getDataItem(key: string[]): any {
+    if (!this.dataJson)
+      return undefined;
+
+    let item = undefined;
+    try {
+      key.forEach(subKey => {
+        item = this.dataJson[subKey];
+      })
+      return item;
+    } catch (e) {
+      return undefined;
+    }
+
   }
 }
