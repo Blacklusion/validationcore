@@ -30,16 +30,14 @@ export async function request(
 
   // Send Request
   if (!payloadAsJson) {
+    const startTime = Date.now();
     await timeout(
       fetch(urlWithPath, {
         method: "GET",
-        headers: {
-          "request-startTime": Date.now(),
-        },
       })
     )
       .then(async (fetchResponse) => {
-        await response.parseFetchResponse(fetchResponse);
+        await response.parseFetchResponse(fetchResponse, startTime);
       })
       .catch((e) => {
         response.parseFetchError(e);
@@ -53,19 +51,18 @@ export async function request(
       response.setErrorMessage("Payload for post request is not valid JSON");
       return response;
     }
-
+  const startTime = Date.now();
     await timeout(
       fetch(urlWithPath, {
         method: "POST",
         headers: {
-          "request-startTime": Date.now(),
           "content-type": contentType,
         },
         data: payloadAsJson,
       })
     )
       .then(async (fetchResponse) => {
-        await response.parseFetchResponse(fetchResponse);
+        await response.parseFetchResponse(fetchResponse, startTime);
       })
       .catch((e) => {
         response.parseFetchError(e);
