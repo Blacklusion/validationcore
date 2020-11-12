@@ -126,8 +126,11 @@ export class NewHttpResponse {
 
     let item = undefined;
     try {
-      key.forEach(subKey => {
-        item = this.dataJson[subKey];
+      key.forEach((value, index) => {
+        if (index === 0)
+          item = this.dataJson[value];
+        else
+          item = item[value];
       })
       return item;
     } catch (e) {
