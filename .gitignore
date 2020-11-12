@@ -4,3 +4,4 @@ config/local.toml
 build/
 tmp/
 temp/
+jsons/
