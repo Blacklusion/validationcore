@@ -5,6 +5,7 @@ import { logger } from "./common";
 import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
+import { addGuild } from "./testing";
 
 // Increases before every validation round and is only used for better logging outputs
 // Useful if validation rounds take longer than validation interval
@@ -37,7 +38,7 @@ function main() {
 
   // Check if Pager mode is enabled
   if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
-    logger.info("Pager mode is disabled. No pager messages will be sent.");
+    logger.warn("Pager mode is disabled. No pager messages will be sent.");
 
   createConnection()
     .then(async () => {
@@ -49,7 +50,7 @@ function main() {
        * Initialize interval based validations
        */
       await validateAllGuilds();
-      setInterval(validateAllGuilds, 600000);
+      //setInterval(validateAllGuilds, 600000);
     })
     .catch((error) => {
       logger.error("Error while connecting to database ", error);
@@ -68,14 +69,15 @@ async function validateAllGuilds() {
   const validationRoundCounterLocal = ++validationRoundCounter;
 
   console.log("\n\n\n");
-  logger.info("STARTING NEW VALIDATION - " + validationRoundCounterLocal);
+  logger.info("STARTING NEW VALIDATION (" + validationRoundCounterLocal + ")");
 
   /**
    * Update Guildinformation in guildtable
    */
+  /*
   await updateGuildTable(true);
   await updateGuildTable(false);
-
+*/
   /**
    * Validate every guild in guildTable
    */
@@ -105,7 +107,7 @@ async function validateAllGuilds() {
 
   // Create Log output when all validations are finished
   Promise.all(validationPromises).then(() => {
-    logger.info("VALIDATION ROUND COMPLETE! - " + validationRoundCounterLocal);
+    logger.info("VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
   });
 }
 
