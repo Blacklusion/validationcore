@@ -55,6 +55,7 @@ export class NewHttpResponse {
     }
 
     // Parse body to json if possible
+    // todo: do over response.json() ?
     try {
       this.dataJson = JSON.parse(this.data);
     } catch (e) {

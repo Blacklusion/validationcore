@@ -5,11 +5,53 @@ import { sleep } from "eosio-protocol";
 import { HttpErrorType } from "./HttpErrorType";
 import { logger } from "../common";
 
-export async function request(
+/**
+ * GET Request
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ */
+export async function get(
   base: string,
   path = "",
-  payloadAsJson: string = undefined,
   retryCounter: number = config.get("validation.request_retry_count"),
+): Promise<NewHttpResponse> {
+  return await request(base, path, retryCounter, true, undefined, undefined);
+}
+
+/**
+ * POST Request
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {json} payloadAsJson = payload as valid json
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
+ */
+export async function post(
+  base: string,
+  path = "",
+  payloadAsJson: any = {},
+  retryCounter: number = config.get("validation.request_retry_count"),
+  contentType = "application/json"
+): Promise<NewHttpResponse> {
+  return await request(base, path, retryCounter, false, payloadAsJson, contentType);
+}
+
+/**
+ * Can be used to perform both get and post request. However, the use of the specific wrapperMethods are recommended
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {boolean} isGetRequest = If true a get Request will be performed, if false a post request will be performed
+ * @param {json} payloadAsJson = payload as valid json
+ * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
+ */
+async function request(
+  base: string,
+  path = "",
+  retryCounter: number = config.get("validation.request_retry_count"),
+  isGetRequest: boolean,
+  payloadAsJson: any = {},
   contentType = "application/json"
 ): Promise<NewHttpResponse> {
   const response = new NewHttpResponse();
@@ -33,7 +75,7 @@ export async function request(
   }
 
   // Send Request
-  if (!payloadAsJson) {
+  if (isGetRequest) {
     const startTime = Date.now();
     await timeout(
       fetch(urlWithPath, {
@@ -47,14 +89,6 @@ export async function request(
         response.parseFetchError(e);
       });
   } else {
-    // todo: decide if really necessary
-    // todo: check if content type match is necessary
-    try {
-      JSON.parse(payloadAsJson);
-    } catch (e) {
-      response.setErrorMessage("Payload for post request is not valid JSON");
-      return response;
-    }
   const startTime = Date.now();
     await timeout(
       fetch(urlWithPath, {
@@ -62,7 +96,7 @@ export async function request(
         headers: {
           "content-type": contentType,
         },
-        data: payloadAsJson,
+        body: JSON.stringify(payloadAsJson),
       })
     )
       .then(async (fetchResponse) => {
@@ -85,16 +119,16 @@ export async function request(
     await sleep(config.get("validation.request_retry_pause_ms"));
 
     // Try again
-    return request(base, path, payloadAsJson, --retryCounter, contentType);
+    return request(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType)
   }
 }
 
 /**
  * Throws an error if promise is not resolved within the specified amount of timeoutMs
- * @param promise = promise to be resolved (e.g. fetch request)
- * @return {Promise<unknown>}
+ * @param {Promise} promise = promise to be resolved (e.g. fetch request)
+ * @return {Promise<Response>} = The outcome of the input request
  */
-function timeout(promise): Promise<Response> {
+function timeout(promise: Promise<any>): Promise<Response> {
   const timeoutMs = config.get("validation.request_timeout_ms");
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
