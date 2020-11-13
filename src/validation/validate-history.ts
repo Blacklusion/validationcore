@@ -52,7 +52,7 @@ export async function validateAll(
       history.ssl_ok = false;
       sslMessage = "not ok, no https url provided";
     } else {
-      await http.request(apiEndpoint, "", undefined, 0).then((response) => {
+      await http.get(apiEndpoint, "",  0).then((response) => {
         if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
           history.ssl_ok = true;
         } else {
@@ -72,10 +72,13 @@ export async function validateAll(
    * Test 1.1 get_transaction
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/history/get_transaction",
-      '{"json": true, "id": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction") + '"}'
+      {
+        "json": true,
+        "id": config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction")
+      }
     )
     .then((response) => {
       history.history_transaction_ok = response.ok && response.isJson();
@@ -97,12 +100,15 @@ export async function validateAll(
    */
   let historyActionsIncorrectMessage = "";
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/history/get_actions",
-      '{"json": true, "pos": -1, "offset": -' +
-        config.get("validation.history_transaction_offset") +
-        ', "account_name": "eosio.token"}'
+      {
+        "json": true,
+        "pos": -1,
+        "offset": config.get("validation.history_transaction_offset"),
+        "account_name": "eosio.token"
+      }
     )
     .then((response) => {
       history.history_actions_ms = response.elapsedTimeInMilliseconds;
@@ -176,12 +182,13 @@ export async function validateAll(
    * Test 1.3 get_key_accounts
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/history/get_key_accounts",
-      '{"json": true, "public_key": "' +
-        config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") +
-        '"}'
+      {
+        "json": true,
+        "public_key": config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key")
+        }
     )
     .then((response) => {
       history.history_key_accounts_ms = response.elapsedTimeInMilliseconds;
@@ -216,7 +223,7 @@ export async function validateAll(
   /**
    * Test 2.1 Hyperion Health
    */
-  await http.request(apiEndpoint, "/v2/health").then((response) => {
+  await http.get(apiEndpoint, "/v2/health").then((response) => {
     // Test 2.1.1 Health version
     history.hyperion_health_version_ok = response.data.version;
     validationMessages.push(
@@ -414,7 +421,7 @@ export async function validateAll(
    * Test 2.2 Hyperion get_transaction
    */
   await http
-    .request(
+    .get(
       apiEndpoint,
       "/v2/history/get_transaction?id=" + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_transaction")
     )
@@ -436,7 +443,7 @@ export async function validateAll(
   /**
    * Test 2.3 Hyperion get_actions
    */
-  await http.request(apiEndpoint, "/v2/history/get_actions?limit=1").then((response) => {
+  await http.get(apiEndpoint, "/v2/history/get_actions?limit=1").then((response) => {
     let hyperionActionsIncorrectMessage = "";
 
     history.hyperion_actions_ms = response.elapsedTimeInMilliseconds;
@@ -491,10 +498,12 @@ export async function validateAll(
    * Test 2.4 Hyperion get_key_accounts
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v2/state/get_key_accounts",
-      '{"public_key": "' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"}'
+      {
+        "public_key": config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key")
+      }
     )
     .then((response) => {
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
