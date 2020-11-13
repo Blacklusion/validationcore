@@ -585,6 +585,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                */
 
               // Get last validation from database with same endpoint url
+                /*
               let lastSeedValidation: Seed;
               if (lastValidation && lastValidation.nodes_seed) {
                 lastSeedValidation = lastValidation.nodes_seed.find((seed) => {
@@ -593,6 +594,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Seed Endpoint
+
               const seedNode: [Seed, string] = await seed.validateAll(
                 guild,
                 lastSeedValidation,
@@ -609,7 +611,9 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 // Add seed validation messages to seed json array
                 seedJsons.push(seedNode[1]);
               }
+                 */
             } else if (node.node_type == "query") {
+              console.log("Query node!")
               /**
                * Test 3.13: Test Api Nodes
                */
@@ -639,7 +643,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 node.features
               );
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(apiNode) && apiNode[0] && apiNode[1] && apiNode[2]) {
+              if (Array.isArray(apiNode) && apiNode[0] && apiNode[1]) {
                 // Add relation to api node to organization database object
                 organization.nodes_api.push(apiNode[0]);
 
@@ -647,6 +651,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 apiJsons.push(apiNode[1]);
 
                 // Add History validation message to history json array
+                if (apiNode[2])
                 historyJsons.push(apiNode[2]);
               }
 
@@ -662,7 +667,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               );
 
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(sslNode) && sslNode[0] && sslNode[1] && sslNode[2]) {
+              if (Array.isArray(sslNode) && sslNode[0] && sslNode[1]) {
                 // Add relation to ssl api node to organization database object
                 organization.nodes_api.push(sslNode[0]);
 
@@ -670,6 +675,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 apiJsons.push(sslNode[1]);
 
                 // Add History validation message to history json array
+                if (sslNode[2])
                 historyJsons.push(sslNode[2]);
               }
             }

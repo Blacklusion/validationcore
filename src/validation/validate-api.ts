@@ -105,9 +105,9 @@ export async function validateAll(
      */
     const serverVersions: Array<string> = config.get(isMainnet ? "mainnet.server_versions" : "testnet.server_versions");
     // todo: test code
-    let serverVersion = response.data["server_version_string"] ? response.data["server_version_string"] : "unknown";
+    const serverVersion = response.getDataItem(["server_version_string"]) ? response.getDataItem(["server_version_string"]) : "unknown";
     api.server_version_ok = serverVersions.includes(serverVersion);
-    api.server_version = response.data["server_version_string"];
+    api.server_version = response.getDataItem(["server_version_string"]);
 
     validationMessages.push(
       evaluateMessage(
@@ -122,7 +122,7 @@ export async function validateAll(
     /**
      * Test 1.2: Api for correct chain
      */
-    api.correct_chain = typeof response.data["chain_id"] == "string" && response.data["chain_id"] === chainId;
+    api.correct_chain = typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
 
     validationMessages.push(
       evaluateMessage(
@@ -138,17 +138,17 @@ export async function validateAll(
      * Test 1.3: Head Block up to date
      */
     let headBlockIncorrectMessage = "";
-    if (typeof response.data["head_block_time"] == "string") {
+    if (typeof response.getDataItem(["head_block_time"]) === "string") {
       // Get current time
       let currentDate: number = Date.now();
 
       // Use time of http request if available in order to avoid server or validation time delay
-      if (typeof response.headers["date"] == "number") {
-        currentDate = new Date(response.headers.date).getTime();
+      if (typeof response.headers.get("date") === "number") {
+        currentDate = new Date(response.headers.get("date")).getTime();
       }
 
       // "+00:00" is necessary for defining date as UTC
-      const timeDelta: number = currentDate - new Date(response.data["head_block_time"] + "+00:00").getTime();
+      const timeDelta: number = currentDate - new Date(response.getDataItem(["head_block_time"]) + "+00:00").getTime();
 
       // Check if headBlock is within the allowed delta
       api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
@@ -202,7 +202,7 @@ export async function validateAll(
   await http.request(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0).then((response) => {
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
-    api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.data.error.details).length != 0;
+    api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
     validationMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,
@@ -233,8 +233,8 @@ export async function validateAll(
         api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
         api.abi_serializer_ok =
           response.ok &&
-          response.data.transactions &&
-          Object.keys(response.data.transactions).length ==
+          response.getDataItem(["transactions"]) &&
+          Object.keys(response.getDataItem(["transactions"])).length ==
             config.get(
               isMainnet
                 ? "mainnet.api_test_big_block_transaction_count"
@@ -384,6 +384,7 @@ export async function validateAll(
       '{"json": true, "keys": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"]}'
     )
     .then((response) => {
+      console.log(response)
       api.wallet_keys_ok = response.ok && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
 
@@ -422,6 +423,7 @@ export async function validateAll(
    * Test History
    */
 
+  /*
   if (api.all_checks_ok) {
     const history = await ValidateHistory.validateAll(
       guild,
@@ -435,6 +437,7 @@ export async function validateAll(
       api.history_validation = history[0];
     }
   }
+   */
 
   /**
    * Validate if supplied features in bp.json are actually supported by Api
@@ -475,6 +478,6 @@ export async function validateAll(
   return [
     api,
     convertArrayToJsonWithHeader(apiEndpoint, validationMessages),
-    Array.isArray(history) && history[1] ? history[1] : undefined,
+    /* Array.isArray(history) && history[1] ? history[1] : */ undefined,
   ];
 }

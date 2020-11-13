@@ -2,6 +2,8 @@ import * as fetch from "node-fetch";
 import * as config from "config";
 import { NewHttpResponse } from "./newHttpResponse";
 import { sleep } from "eosio-protocol";
+import { HttpErrorType } from "./HttpErrorType";
+import { logger } from "../common";
 
 export async function request(
   base: string,
@@ -15,6 +17,7 @@ export async function request(
   // Check if base url was provided
   if (!base || base === "") {
     response.setErrorMessage("No url was provided");
+    response.errorType = HttpErrorType.OTHER;
     return response;
   }
 
@@ -25,6 +28,7 @@ export async function request(
     urlWithPath = new URL(path, base);
   } catch (e) {
     response.setErrorMessage("Invalid url formatting");
+    response.errorType = HttpErrorType.OTHER;
     return response;
   }
 
@@ -72,8 +76,10 @@ export async function request(
   // Return request if successful
   if (response.ok || retryCounter <= 0) {
     return response;
-  } else {
-    // Retry request if not successful
+  }
+  // Retry request if not successful
+  else {
+    logger.debug(urlWithPath + " => Retrying request (" + retryCounter + ")")
 
     // Sleep in order to avoid potential problems with rate limits
     await sleep(config.get("validation.request_retry_pause_ms"));

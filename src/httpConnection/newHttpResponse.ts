@@ -60,6 +60,13 @@ export class NewHttpResponse {
     } catch (e) {
       this.dataJson = undefined;
     }
+
+    // todo: remove code
+    if (!this.ok) {
+      logger.debug(response.url + " => Request not successful" + this.getFormattedErrorMessage())
+    } else {
+      logger.debug(response.url + "=> Request successful")
+    }
   }
 
   parseFetchError(error: any) {
