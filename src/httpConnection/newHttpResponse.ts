@@ -66,7 +66,7 @@ export class NewHttpResponse {
     if (!this.ok) {
       logger.debug(response.url + " => Request not successful" + this.getFormattedErrorMessage())
     } else {
-      logger.debug(response.url + "=> Request successful")
+      logger.debug(response.url + " => Request successful")
     }
   }
 

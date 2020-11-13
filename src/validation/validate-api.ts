@@ -90,8 +90,8 @@ export async function validateAll(
 
     validationMessages.push(
       evaluateMessage(
-        lastValidation.head_block_delta_ok,
-        api.head_block_delta_ok,
+        lastValidation.get_info_ok,
+        api.get_info_ok,
         "Get_info request",
         "successful",
         "not successful" + response.getFormattedErrorMessage()
@@ -267,7 +267,7 @@ export async function validateAll(
         }
     )
     .then((response) => {
-      api.basic_symbol_ok = response.ok && Array.isArray(response.data) && response.data.length == 1;
+      api.basic_symbol_ok = response.ok && Array.isArray(response.dataJson) && response.dataJson.length == 1;
       api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
 
       validationMessages.push(
