@@ -69,7 +69,7 @@ export async function validateAll(
       api.ssl_ok = false;
       sslMessage = "not ok, no https url provided";
     } else {
-      await http.request(apiEndpoint, "", undefined, 0).then((response) => {
+      await http.get(apiEndpoint, "",  0).then((response) => {
         if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
           api.ssl_ok = true;
         } else {
@@ -84,7 +84,7 @@ export async function validateAll(
   /**
    * 1. Test: Basic Checks
    */
-  await http.request(apiEndpoint, "/v1/chain/get_info", '{"json": true}').then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/get_info", {"json": true}).then((response) => {
     api.get_info_ok = response.ok && response.isJson();
     api.get_info_ms = response.elapsedTimeInMilliseconds;
 
@@ -181,7 +181,7 @@ export async function validateAll(
   /**
    * Test 2: Block one exists
    */
-  await http.request(apiEndpoint, "/v1/chain/get_block", '{"block_num_or_id": "1", "json": true}').then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/get_block", {"block_num_or_id": 1, "json": true}).then((response) => {
     api.block_one_ok = response.ok && response.isJson();
     api.block_one_ms = response.elapsedTimeInMilliseconds;
 
@@ -199,7 +199,7 @@ export async function validateAll(
   /**
    * Test 3: Verbose Error
    */
-  await http.request(apiEndpoint, "/v1/chain/should_return_error", '{"json": true}', 0).then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/should_return_error", {"json": true}, 0).then((response) => {
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
     api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
@@ -222,12 +222,11 @@ export async function validateAll(
     config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count")
   ) {
     await http
-      .request(
+      .post(
         apiEndpoint,
         "/v1/chain/get_block",
-        '{"json": true, "block_num_or_id": ' +
-          config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block") +
-          "}"
+        {"json": true, "block_num_or_id":
+          config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block") }
       )
       .then((response) => {
         api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
@@ -257,14 +256,15 @@ export async function validateAll(
    * Test 5: basic symbol
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/chain/get_currency_balance",
-      '{"json": true, "account": "' +
-        config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") +
-        '", "code":"eosio.token", "symbol": "' +
-        config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol") +
-        '"}'
+      {
+        "json": true,
+        "account": config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account"),
+        "code": "eosio.token",
+        "symbol": config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol")
+        }
     )
     .then((response) => {
       api.basic_symbol_ok = response.ok && Array.isArray(response.data) && response.data.length == 1;
@@ -284,7 +284,7 @@ export async function validateAll(
   /**
    * Test 6: producer api disabled
    */
-  await http.request(apiEndpoint, "/v1/producer/get_integrity_hash", undefined, 0).then((response) => {
+  await http.get(apiEndpoint, "/v1/producer/get_integrity_hash",  0).then((response) => {
     // Set status in database
     api.producer_api_ms = response.elapsedTimeInMilliseconds;
     api.producer_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
@@ -309,7 +309,7 @@ export async function validateAll(
   /**
    * Test 7: db_size api disabled
    */
-  await http.request(apiEndpoint, "/v1/db_size/get", undefined, 0).then((response) => {
+  await http.get(apiEndpoint, "/v1/db_size/get",  0).then((response) => {
     // Set status in database
     api.db_size_api_ms = response.elapsedTimeInMilliseconds;
     api.db_size_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
@@ -334,7 +334,7 @@ export async function validateAll(
   /**
    * Test 8: net api disabled
    */
-  await http.request(apiEndpoint, "/v1/net/connections", undefined, 0).then((response) => {
+  await http.get(apiEndpoint, "/v1/net/connections",  0).then((response) => {
     // Set status in database
     api.net_api_ms = response.elapsedTimeInMilliseconds;
     api.net_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
@@ -354,10 +354,13 @@ export async function validateAll(
    * Test 9: Wallet - get_accounts_by_authorizers
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/chain/get_accounts_by_authorizers",
-      '{"json": true, "accounts": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") + '"]}'
+      {
+        "json": true,
+        "accounts": [ config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") ]
+      }
     )
     .then((response) => {
       api.wallet_accounts_ok = response.ok && response.isJson();
@@ -378,13 +381,15 @@ export async function validateAll(
    * Test 9: Wallet - get_accounts_by_authorizers
    */
   await http
-    .request(
+    .post(
       apiEndpoint,
       "/v1/chain/get_accounts_by_authorizers",
-      '{"json": true, "keys": ["' + config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") + '"]}'
+      {
+        "json": true,
+        "keys": [ config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") ]
+      }
     )
     .then((response) => {
-      console.log(response)
       api.wallet_keys_ok = response.ok && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
 
