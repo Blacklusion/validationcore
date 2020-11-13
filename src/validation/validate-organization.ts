@@ -90,7 +90,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   /**
    * Test 1.2: Regged Website
    */
-  await http.request(url).then((response) => {
+  await http.get(url).then((response) => {
     // Set status in database
     organization.reg_website_ok = response.ok;
     organization.reg_website_ms = response.elapsedTimeInMilliseconds;
@@ -112,7 +112,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
    * 2. CHAINS.JSON TESTS
    * ====================================================================================
    */
-  await http.request(url, "/chains.json").then(async (response) => {
+  await http.get(url, "/chains.json").then(async (response) => {
     /**
      * Test 2.1: Chains.json exists at expected location and is valid Json
      */
@@ -170,7 +170,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   let bpJsonIncorrectMessage = "";
   if (pathToBpJson) {
-    await http.request(url, pathToBpJson).then(async (response) => {
+    await http.get(url, pathToBpJson).then(async (response) => {
       /**
        * Test 3.1: bp.json reachable
        */
@@ -237,7 +237,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.3: website
        */
-        await http.request(response.getDataItem(["org","website"])).then((response) => {
+        await http.get(response.getDataItem(["org","website"])).then((response) => {
           organization.bpjson_website_ok = response.ok;
           organization.bpjson_website_ms = response.elapsedTimeInMilliseconds;
 
@@ -256,7 +256,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.4: Code of conduct
        */
-        await http.request(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
+        await http.get(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
           organization.bpjson_code_of_conduct_ok = response.ok;
           organization.bpjson_code_of_conduct_ms = response.elapsedTimeInMilliseconds;
 
@@ -275,7 +275,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.5: Ownership Disclosure
        */
-        await http.request(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
+        await http.get(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
           organization.bpjson_ownership_disclosure_ok = response.ok;
           organization.bpjson_ownership_disclosure_ms = response.elapsedTimeInMilliseconds;
 
@@ -444,7 +444,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       if (response.getDataItem(["org", "branding"]) !== undefined && Object.keys(response.getDataItem(["org", "branding"])).length >= 3) {
         let successfulBrandingRequests = 0;
         // Logo 256px
-        await http.request(response.getDataItem(["org", "branding", "logo_256"])).then((response) => {
+        await http.get(response.getDataItem(["org", "branding", "logo_256"])).then((response) => {
           // Successful request and logo is in right format
           if (response.ok && new RegExp("image/(png|jpg]).*").test(response.headers.get("content-type"))) {
             successfulBrandingRequests++;
@@ -460,7 +460,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         });
 
         // Logo 1024px
-        await http.request(response.getDataItem(["org", "branding", "logo_1024"])).then((response) => {
+        await http.get(response.getDataItem(["org", "branding", "logo_1024"])).then((response) => {
           // Successful request and logo is in right format
           if (response.ok && new RegExp("image/(png|jpg]).*").test(response.headers.get("content-type"))) {
             successfulBrandingRequests++;
@@ -476,7 +476,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         });
 
         // Logo svg
-        await http.request(response.getDataItem(["org", "branding", "logo_svg"])).then((response) => {
+        await http.get(response.getDataItem(["org", "branding", "logo_svg"])).then((response) => {
           // Successful request and logo is in right format
           if (response.ok && new RegExp("image/svg.*").test(response.headers.get("content-type"))) {
             successfulBrandingRequests++;
