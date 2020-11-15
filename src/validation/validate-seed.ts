@@ -16,6 +16,15 @@ import { sendMessageSeed } from "../telegramHandler";
 import { convertArrayToJsonWithHeader, evaluateMessage } from "../messageHandler";
 
 /**
+ * This code is based on the original code of "EOSIO Protocol", published by Michael Yeates
+ * Only the method validateAll() was implemented by Blacklusion
+ *
+ *              https://github.com/michaeljyeates/eosio-protocol
+ *
+ *                              © Michael Yeates
+ */
+
+/**
  * Logger Settings for Organization
  */
 const childLogger: Logger = logger.getChildLogger({
@@ -23,8 +32,8 @@ const childLogger: Logger = logger.getChildLogger({
   minLevel: "debug",
 });
 
-// todo: move debug to config
-const debug = false;
+const configLoggingLevel = config.get("general.logging_level")
+const debug = configLoggingLevel === "silly" || configLoggingLevel === "trace" || configLoggingLevel === "debug";
 
 // todo: remove "Connected to p2p"
 class TestRunner {
@@ -308,14 +317,7 @@ export async function validateAll(
   /**
    * Test 1: Check url
    */
-  if (new RegExp("^https?:\\/\\/").test(p2pEndpoint) || !new RegExp(".+:[0-9]+").test(p2pEndpoint)) {
-    logger.debug("FALSE \t Invalid p2p url");
-    seed.p2p_endpoint_address_ok = false;
-    return;
-  } else {
-    logger.debug("TRUE \t Valid p2p url");
-    seed.p2p_endpoint_address_ok = true;
-  }
+  seed.p2p_endpoint_address_ok = !(new RegExp("^https?:\\/\\/").test(p2pEndpoint)) && new RegExp(".+:[0-9]+").test(p2pEndpoint)
   validationMessages.push(
     evaluateMessage(
       lastValidation.p2p_endpoint_address_ok,
@@ -325,6 +327,9 @@ export async function validateAll(
       "invalid"
     )
   );
+
+  if (!seed.p2p_endpoint_address_ok)
+    return [seed, convertArrayToJsonWithHeader(p2pEndpoint, validationMessages)];
 
   /**
    * 2. Create Seed Connection
