@@ -585,7 +585,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                */
 
               // Get last validation from database with same endpoint url
-                /*
               let lastSeedValidation: Seed;
               if (lastValidation && lastValidation.nodes_seed) {
                 lastSeedValidation = lastValidation.nodes_seed.find((seed) => {
@@ -611,9 +610,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 // Add seed validation messages to seed json array
                 seedJsons.push(seedNode[1]);
               }
-                 */
             } else if (node.node_type == "query") {
-              console.log("Query node!")
               /**
                * Test 3.13: Test Api Nodes
                */

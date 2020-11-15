@@ -45,7 +45,7 @@ function main() {
     .then(async () => {
       logger.info("Successfully connected to database ");
 
-      logger.info("++++++++  STARTUP COMPLETE  ++++++++\n\n");
+      logger.info("++++++++  STARTUP COMPLETE  ++++++++");
 
       /**
        * Initialize interval based validations
@@ -69,8 +69,8 @@ async function validateAllGuilds() {
   // Increase validationRoundCounter and safe local copy to prevent side effects
   const validationRoundCounterLocal = ++validationRoundCounter;
 
-  console.log("\n\n\n");
-  logger.info("STARTING NEW VALIDATION (" + validationRoundCounterLocal + ")");
+  console.log("\n\n");
+  logger.info("STARTING NEW VALIDATION ROUND (" + validationRoundCounterLocal + ")");
 
   /**
    * Update Guildinformation in guildtable

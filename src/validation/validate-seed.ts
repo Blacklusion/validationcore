@@ -402,7 +402,9 @@ export async function validateAll(
    */
   try {
     await database.manager.save(seed);
-    childLogger.info("SAVED \t New Seed validation to database for " + guild.name);
+    childLogger.info("SAVED \t New Seed validation to database for " + guild.name + " " +
+      (isMainnet ? "mainnet" : "testnet") +
+      " to database");
   } catch (error) {
     childLogger.fatal("Error while saving new Seed validation to database", error);
   }

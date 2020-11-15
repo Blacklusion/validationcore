@@ -552,7 +552,9 @@ export async function validateAll(
    */
   try {
     await database.manager.save(history);
-    childLogger.info("SAVED \t New History validation to database for " + guild.name);
+    childLogger.info("SAVED \t New History validation to database for " + guild.name + " " +
+      (isMainnet ? "mainnet" : "testnet") +
+      " to database");
   } catch (error) {
     childLogger.fatal("Error while saving new History validation to database", error);
   }
