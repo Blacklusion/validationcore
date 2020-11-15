@@ -142,7 +142,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
      */
     // todo: check for double headers
     // Set status in database
-    organization.chains_json_access_control_header_ok =
+    organization.chains_json_access_control_header_ok = response.headers !== undefined &&
       response.headers.has("access-control-allow-origin") && response.headers.get("access-control-allow-origin") === "*";
 
     // Create Explanation for Pager Messages and locally stored .json
@@ -326,8 +326,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test : GitHub User
        */
-
-      // todo: add organization github_user database
       let gitHubUserIncorrectMessage = "";
       if (response.getDataItem(["org", "github_user"]) !== undefined) {
         // Get github_user from json
@@ -335,9 +333,16 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
         // More than one GitHub user supplied
         if (Array.isArray(gitHubUserObj)) {
-          let allUsersOk = gitHubUserObj.length >= 1;
           gitHubUserIncorrectMessage = "was provided but has invalid formatting (";
+          organization.bpjson_github_user_ok = true;
 
+          // Check array length
+          if (gitHubUserObj.length === 0) {
+            gitHubUserIncorrectMessage += "an empty array was provided";
+            organization.bpjson_github_user_ok = false;
+          }
+
+          // Iterate over array
           for (const gitHubUser of gitHubUserObj) {
             if (
               !(
@@ -346,32 +351,32 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 !new RegExp("^@").test(gitHubUser)
               )
             ) {
-              gitHubUserIncorrectMessage += (allUsersOk ? "" : ", ") + gitHubUser;
-              allUsersOk = false;
+              gitHubUserIncorrectMessage += (organization.bpjson_github_user_ok ? "" : ", ") + gitHubUser;
+              organization.bpjson_github_user_ok = false;
             }
           }
 
-          gitHubUserIncorrectMessage += ")";
+          gitHubUserIncorrectMessage += ")"
 
           // One GitHub user supplied
         } else {
-          const githubuserstate =
+          organization.bpjson_github_user_ok =
             new RegExp(".+").test(gitHubUserObj) &&
             !new RegExp("https?://.+").test(gitHubUserObj.toLowerCase()) &&
             !new RegExp("^@").test(gitHubUserObj);
 
-          if (!githubuserstate)
             gitHubUserIncorrectMessage = "was provided, but has invalid formatting (" + gitHubUserObj + ")";
         }
       } else {
         gitHubUserIncorrectMessage = "was not provided";
+        organization.bpjson_github_user_ok = false;
       }
 
       // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
-          lastValidation.bpjson_email_ok,
-          organization.bpjson_email_ok,
+          lastValidation.bpjson_github_user_ok,
+          organization.bpjson_github_user_ok,
           "GitHub user in " + pathToBpJson,
           "was provided (min. 1)",
           gitHubUserIncorrectMessage
@@ -381,30 +386,38 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3. : Chain resources
        */
-      // state = true
+      let chainResourcesIncorrectMessage = "";
       if (response.getDataItem(["org", "chain_resources"]) !== undefined) {
         try {
           new URL(response.getDataItem(["org", "chain_resources"]));
+          organization.bpjson_chain_resources_ok = true;
         } catch (e) {
-          // state = false
+          organization.bpjson_chain_resources_ok = false;
+          chainResourcesIncorrectMessage = "is not a valid url"
+
+          if (Array.isArray(response.getDataItem(["org", "chain_resources"])))
+            chainResourcesIncorrectMessage += ". Arrays are not allowed"
         }
+      } else {
+        organization.bpjson_chain_resources_ok = false;
+        chainResourcesIncorrectMessage = "was not provided"
       }
 
       // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
-          lastValidation.bpjson_email_ok,
-          organization.bpjson_email_ok,
+          lastValidation.bpjson_chain_resources_ok,
+          organization.bpjson_chain_resources_ok,
           "Chain resources in " + pathToBpJson,
           "is valid",
-          "is not a valid url. Arrays are not allowed"
+          chainResourcesIncorrectMessage
         )
       );
 
       /**
        * Test 3. : Other resources
        */
-      // state = true
+      organization.bpjson_other_resources_ok = true;
       let otherResourcesIncorrectMessage = "are invalid: ";
       if (response.getDataItem(["org", "other_resources"]) !== undefined) {
         const resourcesArray = response.getDataItem(["org", "other_resources"]);
@@ -414,24 +427,27 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             try {
               new URL(resource);
             } catch (e) {
-              /*
-                if (!state)
+
+                if (!organization.bpjson_other_resources_ok)
                   otherResourcesIncorrectMessage += ", "
-                 */
+
               otherResourcesIncorrectMessage += resource + "(invalid url)";
-              // state = false
+              organization.bpjson_other_resources_ok = false;
             }
           });
         } else {
-          // state = false
           otherResourcesIncorrectMessage = "are not a valid array";
+          organization.bpjson_other_resources_ok = false;
         }
+      } else {
+        otherResourcesIncorrectMessage = "were not provided"
+        organization.bpjson_other_resources_ok = false;
       }
       // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
         evaluateMessage(
-          lastValidation.bpjson_email_ok,
-          organization.bpjson_email_ok,
+          lastValidation.bpjson_other_resources_ok,
+          organization.bpjson_other_resources_ok,
           "Other resources in " + pathToBpJson,
           "are valid",
           otherResourcesIncorrectMessage
