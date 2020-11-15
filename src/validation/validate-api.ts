@@ -428,9 +428,9 @@ export async function validateAll(
    * Test History
    */
 
-  /*
+  let history
   if (api.all_checks_ok) {
-    const history = await ValidateHistory.validateAll(
+    history = await ValidateHistory.validateAll(
       guild,
       isMainnet,
       lastValidation.history_validation,
@@ -442,7 +442,6 @@ export async function validateAll(
       api.history_validation = history[0];
     }
   }
-   */
 
   /**
    * Validate if supplied features in bp.json are actually supported by Api
@@ -483,6 +482,6 @@ export async function validateAll(
   return [
     api,
     convertArrayToJsonWithHeader(apiEndpoint, validationMessages),
-    /* Array.isArray(history) && history[1] ? history[1] : */ undefined,
+    Array.isArray(history) && history.length == 2 ? history[1] : undefined,
   ];
 }
