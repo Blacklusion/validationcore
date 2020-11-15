@@ -203,12 +203,13 @@ function checkConfig(): boolean {
     ["general.json_directory", "string"],
     // Logging_level must not be provided -> defaults to info
 
+    // telegram urls are not declared as url, but as string, so they can be left blank
     ["telegram.public_url", "string"],
     ["telegram.private_url", "string"],
 
     ["mainnet.name", "string"],
     ["mainnet.chain_id", "string"],
-    ["mainnet.api_endpoint", "string"],
+    ["mainnet.api_endpoint", "url"],
     ["mainnet.server_versions", "array"],
     ["mainnet.history_test_transaction", "string"],
     ["mainnet.history_test_public_key", "string"],
@@ -219,7 +220,7 @@ function checkConfig(): boolean {
 
     ["testnet.name", "string"],
     ["testnet.chain_id", "string"],
-    ["testnet.api_endpoint", "string"],
+    ["testnet.api_endpoint", "url"],
     ["testnet.server_versions", "array"],
     ["testnet.history_test_transaction", "string"],
     ["testnet.history_test_public_key", "string"],
@@ -241,9 +242,18 @@ function checkConfig(): boolean {
 
   settings.forEach((setting) => {
     try {
-      if (
-        (setting[1] === "array" && !Array.isArray(config.get(setting[0]))) ||
-        (setting[1] !== "array" && !(typeof config.get(setting[0]) === setting[1]))
+      const configItem = config.get(setting[0])
+      if (setting[1] === "url") {
+        try {
+          new URL(configItem)
+        } catch (e) {
+          logger.error(setting[0] + " was provided. But it is not a valid url.");
+          allVariablesSet = false;
+        }
+      }
+      else if (
+        (setting[1] === "array" && !Array.isArray(configItem)) ||
+        (setting[1] !== "array" && !(typeof configItem === setting[1]))
       ) {
         logger.error(setting[0] + " was provided. But it is not of type " + setting[1]);
         allVariablesSet = false;
