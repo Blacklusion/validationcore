@@ -387,8 +387,6 @@ export async function validateAll(
      * Test 2.1.5 Health of Services
      */
     if (Array.isArray(response.getDataItem(["health"]))) {
-      childLogger.debug("FALSE \t Hyperion Health is missing field Health");
-    } else {
       // NodeosRPC
       const nodeosRpc = response.getDataItem(["health"]).find((x) => x.service === "NodeosRPC");
       history.hyperion_health_nodeosrpc_ok =
