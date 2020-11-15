@@ -8,7 +8,7 @@ import { getConnection } from "typeorm";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { sendMessageOrganization } from "../telegramHandler";
-import { evaluateMessage, convertArrayToJsonWithHeader, writeJsonToDisk } from "../messageHandler";
+import { evaluateMessage, writeJsonToDisk, convertArrayToJson } from "../messageHandler";
 import { Api } from "../database/entity/Api";
 import { Seed } from "../database/entity/Seed";
 import * as http from "../httpConnection/newHttpRequest";
@@ -33,14 +33,16 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   let pathToBpJson: string;
 
   // Stores all validation explanations for organization
-  const validationMessages: Array<[string, boolean]> = [];
+  const validationMessages: Array<[string, number]> = [];
 
   // After each validation a json with all validation messages is stored to disk
-  let jsonString = "{\n" + '"guild": "' + guild.name + '", \n';
-  jsonString += '"isMainnet": ' + isMainnet + ", ";
-  const seedJsons: Array<string> = [];
-  const apiJsons: Array<string> = [];
-  const historyJsons: Array<string> = [];
+  const guildJson = {}
+  guildJson["guild"] = guild.name;
+  guildJson["isMainnet"] = isMainnet;
+
+  const seedJsons: Array<any> = [];
+  const apiJsons: Array<any> = [];
+  const historyJsons: Array<any> = [];
 
   // Create organization object for database
   const database = getConnection();
@@ -732,19 +734,18 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  /*
-  validationMessages = validationMessages.filter((message) => message);
-  if (validationMessages.length > 0) sendMessageOrganization(guild.name, isMainnet, validationMessages);
+  sendMessageOrganization(guild.name, isMainnet, validationMessages);
+
+  /**
+   * Concat all json to single json and write file to disk
    */
+  guildJson["organization"] = convertArrayToJson(validationMessages);
+  guildJson["api_nodes"] = apiJsons;
+  guildJson["history_nodes"] = historyJsons;
+  guildJson["seed_nodes"] = seedJsons
+  await writeJsonToDisk(guild.name, isMainnet, JSON.stringify(guildJson));
 
-  jsonString += "\n" + convertArrayToJsonWithHeader("organization", validationMessages);
-  jsonString += ',\n"api_nodes": [' + apiJsons.join(",\n") + "]";
-  jsonString += ',\n"history_nodes": [' + historyJsons.join(",\n") + "]";
-  jsonString += ',\n"seed_nodes": [' + seedJsons.join(",\n") + "]";
-  jsonString += "\n}";
-
-  await writeJsonToDisk(guild.name, isMainnet, jsonString);
-
+  // It must be returned a dummy promise, so the parent function calling this function waits until all validations are completed
   return Promise.resolve(true);
 }
 
@@ -754,7 +755,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
  * @param {object} location = json formatted object in the following schema: "name", "country", "latitude", "longitude"
  * @return {boolean} = is true if all location checks have passed
  */
-function validateBpLocation(location: object): boolean {
+function validateBpLocation(location: any): boolean {
   let successfulLocationTests = 0;
 
   // Name

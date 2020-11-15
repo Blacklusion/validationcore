@@ -8,7 +8,10 @@ import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/newHttpRequest";
-import { evaluateMessage, convertArrayToJsonWithHeader } from "../messageHandler";
+import {
+  evaluateMessage,
+  convertArrayToJson
+} from "../messageHandler";
 
 /**
  * Logger Settings for Api
@@ -37,7 +40,7 @@ export async function validateAll(
   isSsl: boolean,
   locationOk: boolean,
   features: string[]
-): Promise<[Api, string, string]> {
+): Promise<[Api, any, any]> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -47,7 +50,7 @@ export async function validateAll(
 
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  let validationMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, number]> = [];
 
   // Create api object for database
   const database = getConnection();
@@ -478,12 +481,11 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  validationMessages = validationMessages.filter((message) => message);
-  if (validationMessages.length > 0) sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
+  sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
 
   return [
     api,
-    convertArrayToJsonWithHeader(apiEndpoint, validationMessages),
+    convertArrayToJson(validationMessages, apiEndpoint),
     Array.isArray(history) && history.length == 2 ? history[1] : undefined,
   ];
 }

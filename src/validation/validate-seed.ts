@@ -13,7 +13,7 @@ import { Seed } from "../database/entity/Seed";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { sendMessageSeed } from "../telegramHandler";
-import { convertArrayToJsonWithHeader, evaluateMessage } from "../messageHandler";
+import { convertArrayToJson, evaluateMessage } from "../messageHandler";
 
 /**
  * This code is based on the original code of "EOSIO Protocol", published by Michael Yeates
@@ -302,7 +302,7 @@ export async function validateAll(
 
   // Set general variables
   const api: string = isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint");
-  let validationMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, number]> = [];
 
   // Create seed object for database
   const database = getConnection();
@@ -329,7 +329,7 @@ export async function validateAll(
   );
 
   if (!seed.p2p_endpoint_address_ok)
-    return [seed, convertArrayToJsonWithHeader(p2pEndpoint, validationMessages)];
+    return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
 
   /**
    * 2. Create Seed Connection
@@ -417,8 +417,7 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  validationMessages = validationMessages.filter((message) => message);
-  if (validationMessages.length > 0) sendMessageSeed(guild.name, isMainnet, p2pEndpoint, validationMessages);
+  sendMessageSeed(guild.name, isMainnet, p2pEndpoint, validationMessages);
 
-  return [seed, convertArrayToJsonWithHeader(p2pEndpoint, validationMessages)];
+  return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
 }

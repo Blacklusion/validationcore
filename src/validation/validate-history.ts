@@ -7,7 +7,7 @@ import { getConnection } from "typeorm";
 import { sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as http from "../httpConnection/newHttpRequest";
-import { evaluateMessage, convertArrayToJsonWithHeader } from "../messageHandler";
+import { convertArrayToJson, evaluateMessage } from "../messageHandler";
 
 /**
  * Logger Settings for History
@@ -30,10 +30,10 @@ export async function validateAll(
   lastValidation: History,
   apiEndpoint: string,
   isSsl: boolean
-): Promise<[History, string]> {
+): Promise<[History, any]> {
   if (!apiEndpoint) return undefined;
 
-  let validationMessages: Array<[string, boolean]> = [];
+  let validationMessages: Array<[string, number]> = [];
 
   const database = getConnection();
   const history: History = new History();
@@ -198,7 +198,7 @@ export async function validateAll(
         historyKeyIncorrectMessage = response.getFormattedErrorMessage();
         history.history_key_accounts_ok = false;
       } else {
-        history.history_key_accounts_ok = response.getDataItem(["account_names"]) && response.isJson();
+        history.history_key_accounts_ok = response.isJson() && response.getDataItem(["account_names"]) !== undefined;
       }
 
       validationMessages.push(
@@ -562,8 +562,7 @@ export async function validateAll(
   /**
    * Send Message to all subscribers of guild via. public telegram service
    */
-  validationMessages = validationMessages.filter((message) => message);
-  if (validationMessages.length > 0) sendMessageHistory(guild.name, isMainnet, apiEndpoint, validationMessages);
+  sendMessageHistory(guild.name, isMainnet, apiEndpoint, validationMessages);
 
-  return [history, convertArrayToJsonWithHeader(apiEndpoint, validationMessages)];
+  return [history, convertArrayToJson(validationMessages, apiEndpoint)];
 }
