@@ -11,7 +11,7 @@ import { sendMessageOrganization } from "../telegramHandler";
 import { evaluateMessage, writeJsonToDisk, convertArrayToJson } from "../messageHandler";
 import { Api } from "../database/entity/Api";
 import { Seed } from "../database/entity/Seed";
-import * as http from "../httpConnection/newHttpRequest";
+import * as http from "../httpConnection/HttpRequest";
 
 /**
  * Logger Settings for Organization

@@ -6,7 +6,7 @@ import { History } from "../database/entity/History";
 import { getConnection } from "typeorm";
 import { sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
-import * as http from "../httpConnection/newHttpRequest";
+import * as http from "../httpConnection/HttpRequest";
 import { convertArrayToJson, evaluateMessage } from "../messageHandler";
 
 /**

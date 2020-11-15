@@ -7,7 +7,7 @@ import { Api } from "../database/entity/Api";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
-import * as http from "../httpConnection/newHttpRequest";
+import * as http from "../httpConnection/HttpRequest";
 import {
   evaluateMessage,
   convertArrayToJson

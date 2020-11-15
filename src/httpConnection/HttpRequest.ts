@@ -1,162 +1,148 @@
-import * as axios from "axios";
+import * as fetch from "node-fetch";
+import * as config from "config";
 import { HttpResponse } from "./HttpResponse";
-import { HttpError } from "./HttpError";
+import { sleep } from "eosio-protocol";
 import { HttpErrorType } from "./HttpErrorType";
 import { logger } from "../common";
-import { sleep } from "eosio-protocol";
-import * as config from "config";
 
 /**
- * GET request
- * @param url = http url
- * @param path = api request path
- * @param retryCounter = how often should the request be repeated in case it fails
+ * GET Request
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
  */
 export async function get(
-  url: string,
+  base: string,
   path = "",
-  retryCounter: number = config.get("validation.request_retry_count")
+  retryCounter: number = config.get("validation.request_retry_count"),
 ): Promise<HttpResponse> {
-  // todo: implement no url provided and invalid url error
-  if (!url) {
-    throw new HttpError(1, 0, "No url was provided");
-  }
-  url = new URL(path, url).toString();
-
-  try {
-    const response: axios.AxiosResponse = await axios.default({
-      method: "get",
-      url: url,
-      headers: { "request-startTime": Date.now() },
-      timeout: config.get("validation.request_timeout_ms"),
-    });
-    const httpResponse: HttpResponse = new HttpResponse(response);
-    return new Promise((resolve, reject) => {
-      resolve(httpResponse);
-    });
-
-    // An error will be thrown for every non-OK Code (e.g. 404)
-    // Catch error and throw new Error in standardized Format
-  } catch (error) {
-    const httpError = await categorizeError(error);
-    if (httpError.type == HttpErrorType.TIMEOUT) retryCounter = Math.min(1, retryCounter);
-
-    // Retry x times when request fails
-    if (retryCounter > 0) {
-      console.log(url);
-      console.log(error.message);
-      await sleep(config.get("validation.request_retry_pause_ms"));
-      return await get(url, "", --retryCounter);
-    }
-
-    throw httpError;
-  }
+  return await request(base, path, retryCounter, true, undefined, undefined);
 }
 
 /**
- * POST request
- * @param url = http url
- * @param path = path with or without tracing dash ('/')
- * @param contentType = specify contentType of request, set to json as default, since most of the performed post requests rely on json
- * @param payloadAsJson = payload of the post request in json format
+ * POST Request
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {json} payloadAsJson = payload as valid json
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
  */
 export async function post(
-  url: string,
+  base: string,
   path = "",
-  payloadAsJson: string,
+  payloadAsJson: any = {},
   retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
 ): Promise<HttpResponse> {
-  // todo: implement no url provided and invalid url error
-  if (!url) {
-    throw new HttpError(1, 0, "No url was provided");
+  return await request(base, path, retryCounter, false, payloadAsJson, contentType);
+}
+
+/**
+ * Can be used to perform both get and post request. However, the use of the specific wrapperMethods are recommended
+ * @param {string} base = base url of request without any additional path
+ * @param {string} path = additional path of request, can be undefined
+ * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {boolean} isGetRequest = If true a get Request will be performed, if false a post request will be performed
+ * @param {json} payloadAsJson = payload as valid json
+ * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
+ */
+async function request(
+  base: string,
+  path = "",
+  retryCounter: number = config.get("validation.request_retry_count"),
+  isGetRequest: boolean,
+  payloadAsJson: any = {},
+  contentType = "application/json"
+): Promise<HttpResponse> {
+  const response = new HttpResponse();
+
+  // Check if base url was provided
+  if (!base || base === "") {
+    response.setErrorMessage("No url was provided");
+    response.errorType = HttpErrorType.OTHER;
+    return response;
   }
-  url = new URL(path, url).toString();
 
+  // Combine base and path to url
+  // todo: (optional) check for generic domainnames: google.de etc.
+  let urlWithPath: URL;
   try {
-    const response: axios.AxiosResponse = await axios.default({
-      method: "post",
-      url: url,
-      data: payloadAsJson,
-      headers: { "request-startTime": Date.now(), "Content-Type": contentType },
-      timeout: config.get("validation.request_timeout_ms"),
-    });
-    const httpResponse: HttpResponse = new HttpResponse(response);
+    urlWithPath = new URL(path, base);
+  } catch (e) {
+    response.setErrorMessage("Invalid url formatting");
+    response.errorType = HttpErrorType.OTHER;
+    return response;
+  }
 
-    return new Promise((resolve, reject) => {
-      resolve(httpResponse);
-    });
-    // Catch error and throw new Error in standardized Format
-  } catch (error) {
-    const httpError = await categorizeError(error);
-    if (httpError.type == HttpErrorType.TIMEOUT) retryCounter = Math.min(1, retryCounter);
+  // Send Request
+  if (isGetRequest) {
+    const startTime = Date.now();
+    await timeout(
+      fetch(urlWithPath, {
+        method: "GET",
+      })
+    )
+      .then(async (fetchResponse) => {
+        await response.parseFetchResponse(fetchResponse, startTime);
+      })
+      .catch((e) => {
+        response.parseFetchError(e);
+      });
+  } else {
+  const startTime = Date.now();
+    await timeout(
+      fetch(urlWithPath, {
+        method: "POST",
+        headers: {
+          "content-type": contentType,
+        },
+        body: JSON.stringify(payloadAsJson),
+      })
+    )
+      .then(async (fetchResponse) => {
+        await response.parseFetchResponse(fetchResponse, startTime);
+      })
+      .catch((e) => {
+        response.parseFetchError(e);
+      });
+  }
 
-    //
-    if (retryCounter > 0) {
-      console.log(url);
-      console.log(error.message);
-      await sleep(config.get("validation.request_retry_pause_ms"));
-      return await post(url, "", payloadAsJson, --retryCounter, contentType);
-    } else {
-      throw httpError;
-    }
+  // Return request if successful
+  if (response.ok || retryCounter <= 0) {
+    return response;
+  }
+  // Retry request if not successful
+  else {
+    logger.debug(urlWithPath + " => Retrying request (" + retryCounter + ")")
+
+    // Sleep in order to avoid potential problems with rate limits
+    await sleep(config.get("validation.request_retry_pause_ms"));
+
+    // Try again
+    return request(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType)
   }
 }
 
 /**
- * Parse errors into standardized format for easier differentiation in higher functions
- * Function will contact private administrator over private telegram service if error can not be classified
- * Telegram service specified in config file
- * @param error = that shall be classified
+ * Throws an error if promise is not resolved within the specified amount of timeoutMs
+ * @param {Promise} promise = promise to be resolved (e.g. fetch request)
+ * @return {Promise<Response>} = The outcome of the input request
  */
-function categorizeError(error: any): HttpError {
-  try {
-    /**
-     * SSL-Certificate (Regex matching with "CERT", since multiple values are possible e.g. "ERR_TLS_CERT_ALTNAME_INVALID" "CERT_HAS_EXPIRED"
-     */
-    if (error.code && new RegExp(".*CERT.*").test(error.code)) {
-      return new HttpError(
-        HttpErrorType.SSL,
-        -1,
-        "Invalid SSL certificate" + (error.message ? " (" + error.message + ")" : "")
-      );
-    } else if (
-      /**
-       * HTTP Response returned Error-Code (e.g. 404 Not Found)
-       */
-      error.response &&
-      typeof error.response.status == "number" &&
-      typeof error.response.statusText == "string"
-    ) {
-      return new HttpError(
-        HttpErrorType.HTTP,
-        error.response.status,
-        error.response.status + " " + error.response.statusText,
-        error.response
-      );
-    } else if (error.code && (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED")) {
-      /**
-       * DNS / Invalid DomainName
-       */
-      return new HttpError(HttpErrorType.DNS, -1, "Invalid url/domain");
-    } else if (error.code && (error.code === "ETIMEDOUT" || error.code == "ECONNABORTED")) {
-      /**
-       * Timeout
-       */
-      return new HttpError(HttpErrorType.TIMEOUT, -1, "Timeout during request");
-    }
-
-    // Default: All other errors will not be differentiated
-    // todo: contact private telegram server
-  } catch (error) {
-    logger.fatal("Error during http Error handling: ", error);
-  }
-
-  logger.error(
-    "An uncategorized Error appeared. This does not impact the reliability of the validator. However for best user experience we recommend, adding the following error to the categorization: " +
-      error.message
-  );
-  console.log(error);
-
-  return new HttpError(HttpErrorType.UNKNOWN, -1, "Error during request" + (error.code ? ": " + error.code : ""));
+function timeout(promise: Promise<any>): Promise<Response> {
+  const timeoutMs = config.get("validation.request_timeout_ms");
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error("timeout"));
+    }, timeoutMs);
+    promise.then(
+      (res) => {
+        clearTimeout(timeoutId);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      }
+    );
+  });
 }

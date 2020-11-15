@@ -1,7 +1,7 @@
 import * as config from "config";
 import { logger } from "./common";
 import { convertArrayToJson, messageState } from "./messageHandler";
-import * as http from "./httpConnection/newHttpRequest";
+import * as http from "./httpConnection/HttpRequest";
 
 /**
  * Sends ORGANIZATION telegram messages for all subscribers of that guild
