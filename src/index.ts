@@ -40,7 +40,8 @@ function main() {
   if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
     logger.warn("Pager mode is disabled. No pager messages will be sent.");
 
-  createConnection()
+  createConnection({type: "postgres", host: config.get("database.postgres_host"), port: config.get("database.postgres_port"), username: config.get("database.postgres_user"), password: config.get("database.postgres_password"), database: config.get("database.postgres_db"), entities: [__dirname + "/database/entity/*{.js,.ts}"],
+    synchronize: true})
     .then(async () => {
       logger.info("Successfully connected to database ");
 
