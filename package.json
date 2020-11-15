@@ -1,7 +1,7 @@
 {
   "name": "validationcore",
-  "version": "1.0.0",
-  "description": "Awesome project developed with TypeORM.",
+  "version": "2.0.0",
+  "description": "The validationcore validates the endpoints of an eosio blockchain on a frequent basis and can either be used to send messages to a list of telegram subscribers with the additional pager-telegram-service or it can be used in standalone mode e.g. for providing an insight api.",
   "license": "MPL-2.0",
   "devDependencies": {
     "@types/node": "^8.0.29",
@@ -29,7 +29,8 @@
   },
   "keywords": [
     "blacklusion pager",
-    "wax blockchain"
+    "wax blockchain",
+    "blacklusion"
   ],
   "main": "src/index.ts",
   "scripts": {
