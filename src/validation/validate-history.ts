@@ -106,7 +106,7 @@ export async function validateAll(
       {
         "json": true,
         "pos": -1,
-        "offset": config.get("validation.history_transaction_offset"),
+        "offset": (config.get("validation.history_transaction_offset") * -1),
         "account_name": "eosio.token"
       }
     )
@@ -125,8 +125,8 @@ export async function validateAll(
       // action request contains correct number of actions
       if (
         !(
-          Array.isArray(response.data.actions) &&
-          response.data.actions.length == config.get("validation.history_transaction_offset")
+          Array.isArray(response.getDataItem(["actions"])) &&
+          response.getDataItem(["actions"]).length === config.get("validation.history_transaction_offset")
         )
       ) {
         historyActionsIncorrectMessage += ", returned incorrect number of actions";
@@ -134,24 +134,24 @@ export async function validateAll(
       }
 
       // action request contains last_irreversible_block
-      if (!response.data["last_irreversible_block"]) {
+      if (!response.getDataItem(["last_irreversible_block"])) {
         historyActionsIncorrectMessage += ", last irreversible block not provided";
         errorCounter++;
       }
 
       // action request contains recent eosio.ram action
       if (
-        Array.isArray(response.data.actions) &&
-        response.data.actions.length >= 1 &&
-        response.data.actions[0].block_time
+        Array.isArray(response.getDataItem(["actions"])) &&
+        response.getDataItem(["actions"]).length >= 1 &&
+        response.getDataItem(["actions"])[0].block_time
       ) {
         let currentDate: number = Date.now();
         // Use time of http request if available in order to avoid server or validation time delay
-        if (typeof response.headers["date"] == "number") {
-          currentDate = new Date(response.headers.date).getTime();
+        if (typeof response.headers.get("date") == "number") {
+          currentDate = new Date(response.headers.get("date")).getTime();
         }
         // "+00:00" is necessary for defining date as UTC
-        const timeDelta: number = new Date(response.data.actions[0].block_time + "+00:00").getTime() - currentDate;
+        const timeDelta: number = new Date(response.getDataItem(["actions"])[0].block_time + "+00:00").getTime() - currentDate;
 
         if (!(Math.abs(timeDelta) < config.get("validation.history_actions_block_time_delta"))) {
           historyActionsIncorrectMessage +=
@@ -198,7 +198,7 @@ export async function validateAll(
         historyKeyIncorrectMessage = response.getFormattedErrorMessage();
         history.history_key_accounts_ok = false;
       } else {
-        history.history_key_accounts_ok = response.data["account_names"] && response.isJson();
+        history.history_key_accounts_ok = response.getDataItem(["account_names"]) && response.isJson();
       }
 
       validationMessages.push(
@@ -225,7 +225,7 @@ export async function validateAll(
    */
   await http.get(apiEndpoint, "/v2/health").then((response) => {
     // Test 2.1.1 Health version
-    history.hyperion_health_version_ok = response.data.version;
+    history.hyperion_health_version_ok = response.getDataItem(["version"]) !== undefined;
     validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_health_version_ok,
@@ -237,7 +237,7 @@ export async function validateAll(
     );
 
     // Test 2.1.2 Health Host
-    history.hyperion_health_host_ok = response.data.host;
+    history.hyperion_health_host_ok = response.getDataItem(["host"]) !== undefined;
     validationMessages.push(
       evaluateMessage(
         lastValidation.hyperion_health_host_ok,
@@ -250,12 +250,12 @@ export async function validateAll(
 
     // Test 2.1.3 Query Time
     let queryTimeIncorrectMessage = "not provided";
-    if (response.data.query_time_ms) {
-      history.hyperion_health_query_time_ms = Math.round(response.data.query_time_ms);
-      queryTimeIncorrectMessage = "not ok (" + history.hyperion_health_query_time_ms + ")";
+    if (typeof response.getDataItem(["query_time_ms"]) === "number") {
+      history.hyperion_health_query_time_ms = Math.round(response.getDataItem(["query_time_ms"]));
+      queryTimeIncorrectMessage = "too high (" + history.hyperion_health_query_time_ms + " > " +  + ")";
     }
     history.hyperion_health_query_time_ok =
-      response.data.query_time_ms && response.data.query_time_ms < config.get("validation.hyperion_query_time_ms");
+      typeof response.getDataItem(["query_time_ms"]) === "number" && response.getDataItem(["query_time_ms"]) < config.get("validation.hyperion_query_time_ms");
 
     validationMessages.push(
       evaluateMessage(
@@ -271,17 +271,17 @@ export async function validateAll(
      * Test 2.1.4 Features
      */
     let featureMessage = "";
-    if (!response.data.features) {
+    if (!response.getDataItem(["features"])) {
       featureMessage = ", features array is missing";
       history.hyperion_health_all_features_ok = false;
     } else {
       let errorCounter = 0;
       // tables
-      if (!response.data.features.tables) {
+      if (!response.getDataItem(["features", "tables"])) {
         featureMessage = ", features.tables array missing";
       } else {
         // tables/proposals enabled
-        if (response.data.features.tables.proposals == true) {
+        if (response.getDataItem(["features" , "tables", "proposals"]) == true) {
           history.hyperion_health_features_tables_proposals_on = true;
         } else {
           history.hyperion_health_features_tables_proposals_on = false;
@@ -290,7 +290,7 @@ export async function validateAll(
         }
 
         // tables/accounts enabled
-        if (response.data.features.tables.accounts == true) {
+        if (response.getDataItem(["features", "tables", "accounts"]) == true) {
           history.hyperion_health_features_tables_accounts_on = true;
         } else {
           history.hyperion_health_features_tables_accounts_on = false;
@@ -299,7 +299,7 @@ export async function validateAll(
         }
 
         // tables/voters enabled
-        if (response.data.features.tables.voters == true) {
+        if (response.getDataItem(["features", "tables", "voters"]) == true) {
           history.hyperion_health_features_tables_voters_on = true;
         } else {
           history.hyperion_health_features_tables_voters_on = false;
@@ -309,7 +309,7 @@ export async function validateAll(
       }
 
       // index_deltas enabled
-      if (response.data.features.index_deltas == true) {
+      if (response.getDataItem(["features", "index_deltas"]) == true) {
         history.hyperion_health_features_index_deltas_on = true;
       } else {
         history.hyperion_health_features_index_deltas_on = false;
@@ -318,7 +318,7 @@ export async function validateAll(
       }
 
       // index_transfer_memo enabled
-      if (response.data.features.index_transfer_memo == true) {
+      if (response.getDataItem(["features", "index_transfer_memo"]) == true) {
         history.hyperion_health_features_index_transfer_memo_on = true;
       } else {
         history.hyperion_health_features_index_transfer_memo_on = false;
@@ -327,7 +327,7 @@ export async function validateAll(
       }
 
       // index_all_deltas enabled
-      if (response.data.features.index_all_deltas == true) {
+      if (response.getDataItem(["features", "index_all_deltas"]) == true) {
         history.hyperion_health_features_index_all_deltas_on = true;
       } else {
         history.hyperion_health_features_index_all_deltas_on = false;
@@ -336,7 +336,7 @@ export async function validateAll(
       }
 
       // deferred_trx disabled
-      if (response.data.features.deferred_trx == false || !response.data.features.deferred_trx) {
+      if (response.getDataItem(["features", "deferred_trx"]) == false || response.getDataItem(["features", "deferred_trx"]) === undefined) {
         history.hyperion_health_features_index_deferred_trx_off = true;
       } else {
         history.hyperion_health_features_index_deferred_trx_off = false;
@@ -345,7 +345,7 @@ export async function validateAll(
       }
 
       // failed_trx disabled
-      if (response.data.features.failed_trx == false || !response.data.features.failed_trx) {
+      if (response.getDataItem(["features", "failed_trx"]) == false || response.getDataItem(["features", "failed_trx"]) === undefined) {
         history.hyperion_health_features_index_failed_trx_off = true;
       } else {
         history.hyperion_health_features_index_failed_trx_off = false;
@@ -354,7 +354,7 @@ export async function validateAll(
       }
 
       // resource_limits disabled
-      if (response.data.features.resource_limits == false || !response.data.features.resource_limits) {
+      if (response.getDataItem(["features", "resource_limits"]) == false || response.getDataItem(["features", "resource_limits"]) === undefined) {
         history.hyperion_health_features_resource_limits_off = true;
       } else {
         history.hyperion_health_features_resource_limits_off = false;
@@ -363,7 +363,7 @@ export async function validateAll(
       }
 
       // resource_usage disabled
-      if (response.data.features.resource_usage == false || response.data.features.resource_usage) {
+      if (response.getDataItem(["features", "resource_usage"]) == false || response.getDataItem(["features", "resource_usage"]) === undefined) {
         history.hyperion_health_features_resource_usage_off = true;
       } else {
         history.hyperion_health_features_resource_usage_off = false;
@@ -386,11 +386,11 @@ export async function validateAll(
     /**
      * Test 2.1.5 Health of Services
      */
-    if (response.data.health && Array.isArray(response.data.health)) {
+    if (Array.isArray(response.getDataItem(["health"]))) {
       childLogger.debug("FALSE \t Hyperion Health is missing field Health");
     } else {
       // NodeosRPC
-      const nodeosRpc = response.data.health.find((x) => x.service === "NodeosRPC");
+      const nodeosRpc = response.getDataItem(["health"]).find((x) => x.service === "NodeosRPC");
       history.hyperion_health_nodeosrpc_ok =
         nodeosRpc &&
         nodeosRpc.status === "OK" &&
@@ -399,12 +399,12 @@ export async function validateAll(
         nodeosRpc.service_data.time_offset <= 2000;
 
       // RabbitMq
-      history.hyperion_health_rabbitmq_ok = response.data.health.find(
+      history.hyperion_health_rabbitmq_ok = response.getDataItem(["health"]).find(
         (x) => x.service === "RabbitMq" && x.status === "OK"
       );
 
       // Elastic
-      const elastic = response.data.health.find((x) => x.service === "Elasticsearch");
+      const elastic = response.getDataItem(["health"]).find((x) => x.service === "Elasticsearch");
       history.hyperion_health_elastic_ok =
         elastic && elastic.status === "OK" && elastic.service_data && elastic.service_data.active_shards === "100.0%";
 
@@ -456,9 +456,9 @@ export async function validateAll(
     // block_time missing in last action
     else if (
       !(
-        Array.isArray(response.data.actions) &&
-        response.data.actions.length == 1 &&
-        response.data.actions[0]["@timestamp"]
+        Array.isArray(response.getDataItem(["actions"])) &&
+        response.getDataItem(["actions"]).length == 1 &&
+        response.getDataItem(["actions"])[0]["@timestamp"]
       )
     ) {
       hyperionActionsIncorrectMessage = ", block_time not provided";
@@ -467,11 +467,11 @@ export async function validateAll(
       let currentDate: number = Date.now();
 
       // Use time of http request if available in order to avoid server or validation time delay
-      if (response.headers.date) {
-        currentDate = new Date(response.headers.date).getTime();
+      if (response.headers.get("date")) {
+        currentDate = new Date(response.headers.get("date")).getTime();
       }
       // "+00:00" is necessary for defining date as UTC
-      const timeDelta: number = currentDate - new Date(response.data.actions[0]["@timestamp"] + "+00:00").getTime();
+      const timeDelta: number = currentDate - new Date(response.getDataItem(["actions"])[0]["@timestamp"] + "+00:00").getTime();
 
       // Hyperion up-to-date
       if (Math.abs(timeDelta) < 300000) {
@@ -507,7 +507,7 @@ export async function validateAll(
     )
     .then((response) => {
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
-      history.hyperion_key_accounts_ok = response.ok && response.isJson() && response.data["account_names"];
+      history.hyperion_key_accounts_ok = response.ok && response.isJson() && response.getDataItem(["actions", "account_names"]);
 
       validationMessages.push(
         evaluateMessage(
