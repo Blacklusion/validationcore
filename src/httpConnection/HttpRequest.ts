@@ -67,7 +67,15 @@ async function request(
   // todo: (optional) check for generic domainnames: google.de etc.
   let urlWithPath: URL;
   try {
-    urlWithPath = new URL(path, base);
+    // Extract original path (needs to be done, since new URL(path, base) would overwrite the original path)
+    const originalPath = new URL(base).pathname;
+
+    if (originalPath.length >= 1 && path.length >= 1) {
+      const combinedPath = originalPath + (originalPath.charAt(originalPath.length - 1) === "/" ? "" : "/") + (path.charAt(0) === "/" ? path.substring(1, path.length) : path);
+      urlWithPath = new URL(combinedPath, base);
+    } else {
+      urlWithPath = new URL(path, base);
+    }
   } catch (e) {
     response.setErrorMessage("Invalid url formatting");
     response.errorType = HttpErrorType.OTHER;
