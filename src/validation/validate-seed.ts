@@ -397,7 +397,7 @@ export async function validateAll(
     evaluateMessage(
       lastValidation.all_checks_ok,
       seed.all_checks_ok,
-      "Seed Node",
+      "Seed Node is",
       "healthy",
       "not healthy"
     )

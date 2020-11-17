@@ -7,14 +7,14 @@ import { validateAll } from "./validation/validate-organization";
  * Method used for TESTING purposes
  * Adds a single guild to database
  */
-async function addGuild() {
+export async function addGuild() {
   const database = getConnection();
   const guild: Guild = new Guild();
   guild.name = "blacklusionx";
   guild.isTestnet = true;
   guild.isMainnet = true;
-  // guild.mainnet_location = "267";
-  // guild.testnet_location = "267";
+  guild.mainnet_location = 267;
+  guild.testnet_location = 267;
   guild.mainnet_url = "https://blacklusion.io";
   guild.testnet_url = "https://blacklusion.io";
   await database.manager.save(guild);
@@ -25,7 +25,7 @@ async function addGuild() {
  * Validates a single guild
  * @param guildName = Name of guild on chain
  */
-async function validateGuild(guildName: string) {
+export async function validateGuild(guildName: string) {
   const database = getConnection();
   const guild = await database.manager.findOne(Guild, {
     where: [{ name: guildName }],

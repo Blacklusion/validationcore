@@ -117,7 +117,6 @@ export async function validateAll(
      * Test 1.1: Server Version
      */
     const serverVersions: Array<string> = config.get(isMainnet ? "mainnet.server_versions" : "testnet.server_versions");
-    // todo: test code
     const serverVersion = response.getDataItem(["server_version_string"]) ? response.getDataItem(["server_version_string"]) : "unknown";
     api.server_version_ok = serverVersions.includes(serverVersion);
     api.server_version = response.getDataItem(["server_version_string"]);
@@ -457,8 +456,8 @@ export async function validateAll(
    * Set all checks ok
    * (location check is excluded, because a wrong location does not interfere with the function of an Api node
    */
-  // todo: check
-  api.all_checks_ok =
+  // An unpleasant solution, however simplifying this into a single line would cause sideeffects with undefined. This ensures the result will always be a boolean
+  if (
     api.server_version_ok &&
     api.correct_chain &&
     api.head_block_delta_ok &&
@@ -469,7 +468,11 @@ export async function validateAll(
     api.basic_symbol_ok &&
     api.producer_api_off &&
     api.db_size_api_off &&
-    api.net_api_off;
+    api.net_api_off) {
+    api.all_checks_ok = true;
+  } else {
+    api.all_checks_ok = false;
+  }
 
   /**
    * Test History
@@ -540,7 +543,7 @@ export async function validateAll(
     evaluateMessage(
       lastValidation.wallet_all_checks_ok,
       api.wallet_all_checks_ok,
-      "Account Query Api",
+      "Account Query Api is",
       "healthy",
       "not healthy"
     )

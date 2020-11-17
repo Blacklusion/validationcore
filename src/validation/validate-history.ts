@@ -646,14 +646,17 @@ export async function validateAll(
   /**
    * History Health
    */
-  history.history_all_checks_ok =
-    history.history_transaction_ok && history.history_actions_ok && history.history_key_accounts_ok;
+  if (history.history_transaction_ok && history.history_actions_ok && history.history_key_accounts_ok) {
+    history.history_all_checks_ok = true;
+  } else {
+    history.history_all_checks_ok = false;
+  }
 
   validationMessages.push(
     evaluateMessage(
       lastValidation.history_all_checks_ok,
       history.history_all_checks_ok,
-      "History /v1/history",
+      "History /v1/history is",
       "healthy",
       "not healthy"
     )
@@ -663,7 +666,7 @@ export async function validateAll(
    * Hyperion Health
    */
   // failed_trx && deferred_trx && resource_limits && resource_usage are ignored
-  history.hyperion_all_checks_ok =
+   if (
     history.hyperion_health_found &&
     history.hyperion_health_version_ok &&
     history.hyperion_health_host_ok &&
@@ -680,13 +683,17 @@ export async function validateAll(
     history.hyperion_health_total_indexed_blocks_ok &&
     history.hyperion_transaction_ok &&
     history.hyperion_actions_ok &&
-    history.hyperion_key_accounts_ok;
+    history.hyperion_key_accounts_ok) {
+     history.hyperion_all_checks_ok = true;
+   } else {
+     history.hyperion_all_checks_ok = false;
+   }
 
   validationMessages.push(
     evaluateMessage(
       lastValidation.hyperion_all_checks_ok,
       history.hyperion_all_checks_ok,
-      "Hyperion /v2/history",
+      "Hyperion /v2/history is",
       "healthy",
       "not healthy"
     )
