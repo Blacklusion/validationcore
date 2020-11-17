@@ -10,8 +10,7 @@ import * as http from "./httpConnection/HttpRequest";
  * @param {[string, number][]} messages =
  */
 export function sendMessageOrganization(guildName: string, isMainnet: boolean, messages: [string, number][]): void {
-  const headerMessage = "<b>" + (isMainnet ? "Mainnet" : "Testnet") + " Organization Results:</b> \\n";
-  sendMessage(guildName, isMainnet, headerMessage, messages, "/organization");
+  sendMessage(guildName, isMainnet, "", messages, "/organization");
 }
 
 /**
@@ -27,8 +26,7 @@ export function sendMessageApi(
   apiEndpoint: string,
   messages: [string, number][]
 ): void {
-  const headerMessage = "<b>" + (isMainnet ? "Mainnet" : "Testnet") + " Api results for: " + apiEndpoint + "</b> \\n";
-  sendMessage(guildName, isMainnet, headerMessage, messages, "/api");
+  sendMessage(guildName, isMainnet, apiEndpoint, messages, "/api");
 }
 
 /**
@@ -44,9 +42,7 @@ export function sendMessageHistory(
   apiEndpoint: string,
   messages: [string, number][]
 ): void {
-  const headerMessage =
-    "<b>" + (isMainnet ? "Mainnet" : "Testnet") + " History results for: " + apiEndpoint + "</b> \\n";
-  sendMessage(guildName, isMainnet, headerMessage, messages, "/history");
+  sendMessage(guildName, isMainnet, apiEndpoint, messages, "/history");
 }
 
 /**
@@ -62,8 +58,7 @@ export function sendMessageSeed(
   p2pEndpoint: string,
   messages: [string, number][]
 ): void {
-  const headerMessage = "<b>" + (isMainnet ? "Mainnet" : "Testnet") + " P2P results for: " + p2pEndpoint + "</b> \\n";
-  sendMessage(guildName, isMainnet, headerMessage, messages, "/seed");
+  sendMessage(guildName, isMainnet, p2pEndpoint, messages, "/seed");
 }
 
 /**
