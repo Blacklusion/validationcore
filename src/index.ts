@@ -5,7 +5,6 @@ import { logger } from "./common";
 import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
-import { addGuild, validateGuild } from "./testing";
 
 // Increases before every validation round and is only used for better logging outputs
 // Useful if validation rounds take longer than validation interval
@@ -51,7 +50,6 @@ function main() {
        * Initialize interval based validations
        */
       validateAllGuilds();
-      //await validateGuild("blacklusionx")
       setInterval(validateAllGuilds, 600000);
     })
     .catch((error) => {
