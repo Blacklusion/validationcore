@@ -55,7 +55,7 @@ export class HttpResponse {
 
     // Check if Request was successful
     if (!this.ok) {
-      this.errorMessage = response.statusText;
+      this.errorMessage = this.httpCode + " " + response.statusText;
       this.errorType = HttpErrorType.HTTP;
     }
 
@@ -73,9 +73,9 @@ export class HttpResponse {
     }
 
     if (!this.ok) {
-      logger.debug(response.url + " => Request not successful" + this.getFormattedErrorMessage())
+      logger.silly(response.url + " => Request not successful" + this.getFormattedErrorMessage())
     } else {
-      logger.debug(response.url + " => Request successful")
+      logger.silly(response.url + " => Request successful")
     }
   }
 
@@ -113,6 +113,8 @@ export class HttpResponse {
       logger.warn("An unknown error was tried to be parsed during a httpRequest. This should not be the case: ", error);
       this.errorType = HttpErrorType.UNKNOWN;
     }
+
+    logger.debug("ERROR: Request not successful" + this.getFormattedErrorMessage())
   }
 
   /**

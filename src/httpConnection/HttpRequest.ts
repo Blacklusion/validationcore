@@ -121,7 +121,7 @@ async function request(
   }
   // Retry request if not successful
   else {
-    logger.debug(urlWithPath + " => Retrying request (" + retryCounter + ")")
+    logger.silly(urlWithPath + " => Retrying request (" + retryCounter + ")")
 
     // Sleep in order to avoid potential problems with rate limits
     await sleep(config.get("validation.request_retry_pause_ms"));
@@ -153,4 +153,14 @@ function timeout(promise: Promise<any>): Promise<Response> {
       }
     );
   });
+}
+
+export function evaluatePerformanceMode(failedRequests: number): number {
+  if (config.get("validation.performance_mode") && Math.max(0, config.get("validation.performance_mode_threshold")) <= failedRequests) {
+    logger.silly("Performance mode kicked in")
+    return 0;
+  }
+  else {
+    return undefined;
+  }
 }

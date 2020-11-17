@@ -28,14 +28,12 @@ import { convertArrayToJson, evaluateMessage } from "../messageHandler";
  * Logger Settings for Organization
  */
 const childLogger: Logger = logger.getChildLogger({
-  name: "P2P-Validation",
-  minLevel: "debug",
+  name: "P2P-Validation"
 });
 
 const configLoggingLevel = config.get("general.logging_level")
-const debug = configLoggingLevel === "silly" || configLoggingLevel === "trace" || configLoggingLevel === "debug";
+const debug = configLoggingLevel === "silly" || configLoggingLevel === "trace";
 
-// todo: remove "Connected to p2p"
 class TestRunner {
   protected lastBlockTime: bigint;
   protected blockCount: number;
@@ -350,20 +348,18 @@ export async function validateAll(
        * Test 2.1: p2p Connection successful
        */
       if (result.status == "success") {
-        logger.debug("TRUE \t Seed Connection to " + p2pEndpoint + " successful");
         seed.p2p_connection_possible = true;
 
         /**
          * Test 2.2: block transmission speed ok
          */
         if (result.speed && result.speed > config.get("validation.p2p_ok_speed")) {
-          logger.debug("TRUE \t Block Transmission Speed OK");
           seed.block_transmission_speed_ok = true;
           seed.block_transmission_speed_ms = Math.round(result.speed);
         } else {
-          logger.debug("FALSE \t Block Transmission Speed too slow");
           seed.block_transmission_speed_ok = false;
         }
+
         validationMessages.push(
           evaluateMessage(
             lastValidation.block_transmission_speed_ok,
@@ -374,14 +370,9 @@ export async function validateAll(
           )
         );
       } else {
-        logger.debug(
-          "FALSE \t Seed Connection failed due to a " +
-            result.error_code +
-            " error with the message: " +
-            result.error_detail
-        );
         seed.p2p_connection_possible = false;
       }
+
       validationMessages.push(
         evaluateMessage(
           lastValidation.p2p_connection_possible,
@@ -407,7 +398,7 @@ export async function validateAll(
    */
   try {
     await database.manager.save(seed);
-    childLogger.info("SAVED \t New Seed validation to database for " + guild.name + " " +
+    childLogger.debug("SAVED \t New Seed validation to database for " + guild.name + " " +
       (isMainnet ? "mainnet" : "testnet") +
       " to database");
   } catch (error) {
