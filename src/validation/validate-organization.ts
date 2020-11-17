@@ -38,6 +38,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   // After each validation a json with all validation messages is stored to disk
   const guildJson = {}
   guildJson["guild"] = guild.name;
+  guildJson["validation_date"] = new Date();
   guildJson["isMainnet"] = isMainnet;
 
   const seedJsons: Array<any> = [];
@@ -595,9 +596,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             /**
              * Test 3.11: Check if producer is listed
              */
-            if (node.node_type == "producer") {
+            if (node.node_type == "producer" || (Array.isArray(node.node_type) && node.node_type.includes("producer"))) {
               if (!organization.nodes_producer_found) organization.nodes_producer_found = locationOk;
-            } else if (node.node_type == "seed") {
+            }
+            if (node.node_type == "seed" || (Array.isArray(node.node_type) && node.node_type.includes("seed"))) {
               /**
                * Test 3.12: Test P2P Nodes
                */
@@ -628,7 +630,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 // Add seed validation messages to seed json array
                 seedJsons.push(seedNode[1]);
               }
-            } else if (node.node_type == "query") {
+            }
+            if (node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) {
               /**
                * Test 3.13: Test Api Nodes
                */
@@ -728,7 +731,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   // Store Organization object to Database
   await database.manager.save(organization);
-  childLogger.info(
+  childLogger.debug(
     "SAVED \t New organization validation for " +
       guild.name +
       " " +
