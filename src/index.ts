@@ -5,7 +5,7 @@ import { logger } from "./common";
 import { createConnection, getConnection } from "typeorm";
 const fetch = require("node-fetch");
 import { JsonRpc } from "eosjs";
-import { addGuild } from "./testing";
+import { addGuild, validateGuild } from "./testing";
 
 // Increases before every validation round and is only used for better logging outputs
 // Useful if validation rounds take longer than validation interval
@@ -50,8 +50,9 @@ function main() {
       /**
        * Initialize interval based validations
        */
-      await validateAllGuilds();
-      //setInterval(validateAllGuilds, 600000);
+      validateAllGuilds();
+      //await validateGuild("blacklusionx")
+      setInterval(validateAllGuilds, 600000);
     })
     .catch((error) => {
       logger.error("Error while connecting to database ", error);
@@ -75,14 +76,17 @@ async function validateAllGuilds() {
   /**
    * Update Guildinformation in guildtable
    */
-  /*
+
   await updateGuildTable(true);
   await updateGuildTable(false);
-*/
+
   /**
    * Validate every guild in guildTable
    */
   const validationPromises: Promise<boolean>[] = [];
+  let guildCounter = 0;
+  let resolvedGuildCounter = 0;
+  let guildsArray: string[] = [];
   await database.manager.find(Guild).then((guilds) => {
     guilds.forEach((guild) => {
       if (!guild) {
@@ -94,22 +98,43 @@ async function validateAllGuilds() {
        * Validate Guild for Mainnet
        */
       if (guild.isMainnet) {
-        validationPromises.push(validateAll(guild, true));
+
+        guildsArray.push(guild.name + "_main")
+        guildCounter++;
+        const promise = validateAll(guild, true)
+        validationPromises.push(promise);
+        promise.then(() => {
+          guildsArray = guildsArray.filter(x => x !== guild.name + "_main")
+          resolvedGuildCounter++;
+          logger.info("ROUND " + validationRoundCounterLocal + " - [" + resolvedGuildCounter + "/" + guildCounter + "] Finished evaluating guild " + guild.name + " mainnet"  + (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : ""))
+        })
       }
 
       /**
        * Validate Guild for Testnet
        */
       if (guild.isTestnet) {
-        validationPromises.push(validateAll(guild, false));
+        guildsArray.push(guild.name + "_test")
+        guildCounter++;
+        const promise = validateAll(guild, false)
+        validationPromises.push(promise);
+        promise.then(() => {
+          guildsArray = guildsArray.filter(x => x !== guild.name + "_test")
+          resolvedGuildCounter++;
+          logger.info("ROUND " + validationRoundCounterLocal + " - [" + resolvedGuildCounter + "/" + guildCounter + "] Finished evaluating guild " + guild.name + " testnet"  + (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : ""))
+        })
       }
     });
   });
 
   // Create Log output when all validations are finished
-  Promise.all(validationPromises).then(() => {
+  await Promise.all(validationPromises).then((x) => {
     logger.info("VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
+  }).catch(e => {
+    logger.error("ERROR DURING VALIDATION ROUND (" + validationRoundCounterLocal + ")", e)
   });
+
+  return Promise.resolve(true);
 }
 
 /**
@@ -238,6 +263,14 @@ function checkConfig(): boolean {
     ["validation.history_actions_block_time_delta", "number"],
     ["validation.hyperion_query_time_ms", "number"],
     ["validation.social_services", "array"],
+    ["validation.performance_mode", "boolean"],
+    ["validation.performance_mode_threshold", "number"],
+
+    ["database.postgres_host", "string"],
+    ["database.postgres_port", "number"],
+    ["database.postgres_user", "string"],
+    ["database.postgres_password", "string"],
+    ["database.postgres_db", "string"]
   ];
 
   settings.forEach((setting) => {

@@ -393,6 +393,16 @@ export async function validateAll(
    */
   seed.all_checks_ok = seed.p2p_endpoint_address_ok && seed.p2p_connection_possible && seed.block_transmission_speed_ok;
 
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.all_checks_ok,
+      seed.all_checks_ok,
+      "Seed Node",
+      "healthy",
+      "not healthy"
+    )
+  );
+
   /**
    * Store results in Database
    */

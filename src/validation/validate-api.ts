@@ -48,9 +48,12 @@ export async function validateAll(
     return undefined;
   }
 
+  // Counts how many requests have failed. If performance mode is enabled, future requests may not be performed, if to many requests already failed
+  let failedRequestCounter = 0;
+
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  let validationMessages: Array<[string, number]> = [];
+  const validationMessages: Array<[string, number]> = [];
 
   // Create api object for database
   const database = getConnection();
@@ -58,6 +61,7 @@ export async function validateAll(
   api.guild = guild.name;
   api.location_ok = locationOk;
   api.api_endpoint = apiEndpoint;
+  api.validation_is_mainnet = isMainnet;
 
   // Create dummy api object if lastValidation is undefined
   if (!lastValidation) lastValidation = new Api();
@@ -82,12 +86,15 @@ export async function validateAll(
       });
     }
     validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
+
+    if (!api.ssl_ok)
+      failedRequestCounter++;
   }
 
   /**
    * 1. Test: Basic Checks
    */
-  await http.post(apiEndpoint, "/v1/chain/get_info", {"json": true}).then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/get_info", {"json": true}, http.evaluatePerformanceMode(failedRequestCounter)).then((response) => {
     api.get_info_ok = response.ok && response.isJson();
     api.get_info_ms = response.elapsedTimeInMilliseconds;
 
@@ -101,7 +108,10 @@ export async function validateAll(
       )
     );
 
-    if (!api.get_info_ok) return;
+    if (!api.get_info_ok) {
+      failedRequestCounter++;
+      return;
+    }
 
     /**
      * Test 1.1: Server Version
@@ -184,7 +194,7 @@ export async function validateAll(
   /**
    * Test 2: Block one exists
    */
-  await http.post(apiEndpoint, "/v1/chain/get_block", {"block_num_or_id": 1, "json": true}).then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/get_block", {"block_num_or_id": 1, "json": true}, http.evaluatePerformanceMode(failedRequestCounter)).then((response) => {
     api.block_one_ok = response.ok && response.isJson();
     api.block_one_ms = response.elapsedTimeInMilliseconds;
 
@@ -197,6 +207,9 @@ export async function validateAll(
         "not passed" + response.getFormattedErrorMessage()
       )
     );
+
+    if (!api.block_one_ok)
+      failedRequestCounter++;
   });
 
   /**
@@ -215,6 +228,9 @@ export async function validateAll(
         "not passed" + response.getFormattedErrorMessage()
       )
     );
+
+    if (!api.verbose_error_ok)
+      failedRequestCounter++;
   });
 
   /**
@@ -229,7 +245,8 @@ export async function validateAll(
         apiEndpoint,
         "/v1/chain/get_block",
         {"json": true, "block_num_or_id":
-          config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block") }
+          config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block") },
+        http.evaluatePerformanceMode(failedRequestCounter)
       )
       .then((response) => {
         api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
@@ -252,6 +269,9 @@ export async function validateAll(
             "not passed" + response.getFormattedErrorMessage()
           )
         );
+
+        if (!api.abi_serializer_ok)
+          failedRequestCounter++;
       });
   }
 
@@ -267,7 +287,8 @@ export async function validateAll(
         "account": config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account"),
         "code": "eosio.token",
         "symbol": config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol")
-        }
+        },
+      http.evaluatePerformanceMode(failedRequestCounter)
     )
     .then((response) => {
       api.basic_symbol_ok = response.ok && Array.isArray(response.dataJson) && response.dataJson.length == 1;
@@ -282,6 +303,9 @@ export async function validateAll(
           "not passed" + response.getFormattedErrorMessage()
         )
       );
+
+      if (!api.basic_symbol_ok)
+        failedRequestCounter++;
     });
 
   /**
@@ -290,7 +314,8 @@ export async function validateAll(
   await http.get(apiEndpoint, "/v1/producer/get_integrity_hash",  0).then((response) => {
     // Set status in database
     api.producer_api_ms = response.elapsedTimeInMilliseconds;
-    api.producer_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+    // Test should be successful if a html page is returned, hence !response.isJson()
+    api.producer_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let producerApiIncorrectMessage = "is enabled. This feature should be disabled";
@@ -307,6 +332,9 @@ export async function validateAll(
         producerApiIncorrectMessage
       )
     );
+
+    if (!api.producer_api_off)
+      failedRequestCounter++;
   });
 
   /**
@@ -315,7 +343,8 @@ export async function validateAll(
   await http.get(apiEndpoint, "/v1/db_size/get",  0).then((response) => {
     // Set status in database
     api.db_size_api_ms = response.elapsedTimeInMilliseconds;
-    api.db_size_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+    // Test should be successful if a html page is returned, hence !response.isJson()
+    api.db_size_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let dbSizeIncorrectMessage = "is enabled. This feature should be disabled";
@@ -332,6 +361,9 @@ export async function validateAll(
         dbSizeIncorrectMessage
       )
     );
+
+    if(!api.db_size_api_off)
+      failedRequestCounter++;
   });
 
   /**
@@ -340,7 +372,8 @@ export async function validateAll(
   await http.get(apiEndpoint, "/v1/net/connections",  0).then((response) => {
     // Set status in database
     api.net_api_ms = response.elapsedTimeInMilliseconds;
-    api.net_api_off = !response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100;
+    // Test should be successful if a html page is returned, hence !response.isJson()
+    api.net_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let netApiIncorrectMessage = "is enabled. This feature should be disabled";
@@ -351,6 +384,9 @@ export async function validateAll(
     validationMessages.push(
       evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
     );
+
+    if (!api.net_api_off)
+      failedRequestCounter++;
   });
 
   /**
@@ -363,7 +399,8 @@ export async function validateAll(
       {
         "json": true,
         "accounts": [ config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") ]
-      }
+      },
+      http.evaluatePerformanceMode(failedRequestCounter)
     )
     .then((response) => {
       api.wallet_accounts_ok = response.ok && response.isJson();
@@ -378,6 +415,9 @@ export async function validateAll(
           "not passed" + response.getFormattedErrorMessage()
         )
       );
+
+      if (!api.wallet_accounts_ok)
+        failedRequestCounter++;
     });
 
   /**
@@ -390,7 +430,8 @@ export async function validateAll(
       {
         "json": true,
         "keys": [ config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") ]
-      }
+      },
+      http.evaluatePerformanceMode(failedRequestCounter)
     )
     .then((response) => {
       api.wallet_keys_ok = response.ok && response.isJson();
@@ -405,9 +446,12 @@ export async function validateAll(
           "not passed" + response.getFormattedErrorMessage()
         )
       );
+
+      if (!api.wallet_keys_ok)
+        failedRequestCounter++;
     });
 
-  // api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok
+  api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok
 
   /**
    * Set all checks ok
@@ -421,7 +465,7 @@ export async function validateAll(
     api.block_one_ok &&
     api.block_one_ok &&
     api.verbose_error_ok &&
-    api.abi_serializer_ok &&
+    (config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") && config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count") ? api.abi_serializer_ok : true) &&
     api.basic_symbol_ok &&
     api.producer_api_off &&
     api.db_size_api_off &&
@@ -449,31 +493,65 @@ export async function validateAll(
   /**
    * Validate if supplied features in bp.json are actually supported by Api
    */
+  api.bp_json_all_features_ok = false;
+  let featuresIncorrectMessage = "were not provided"
   if (features !== undefined) {
-    features.forEach((feature) => {
-      switch (feature) {
-        case "chain-api":
-          // api.chains_feature = api.all_checks_ok
-          break;
-        case "account-query":
-          // api.wallet_feature = api.all_wallet_checks_ok
-          break;
-        case "history-v1":
-          break;
-        case "hyperion-v2":
-          break;
-        default:
-          childLogger.debug("Api Feature is not validated by Validationcore");
+    featuresIncorrectMessage = "not ok"
+    api.bp_json_all_features_ok = true;
+
+    const testedFeatures: [string, boolean][] = [["chain-api", api.all_checks_ok], ["account-query", api.wallet_all_checks_ok], ["history-v1", api.history_validation !== undefined && api.history_validation.history_all_checks_ok], ["hyperion-v2", api.history_validation !== undefined && api.history_validation.hyperion_all_checks_ok]]
+
+    testedFeatures.forEach(feature => {
+      if (features.includes(feature[0])) {
+        if (!feature[1]) {
+          api.bp_json_all_features_ok = false;
+          featuresIncorrectMessage += ', "' + feature[0] + '" (not working, but was included in features array)'
+        }
+      } else {
+        if (feature[1]) {
+          api.bp_json_all_features_ok = false;
+          featuresIncorrectMessage += ', "' + feature[0] + '" (working, but was not not included in features array)'
+        }
       }
-    });
+    })
   }
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bp_json_all_features_ok,
+      api.bp_json_all_features_ok,
+      "Supplied features in bp.json are",
+      "ok",
+      featuresIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.all_checks_ok,
+      api.all_checks_ok,
+      "Chain Api",
+      "healthy",
+      "not healthy"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.wallet_all_checks_ok,
+      api.wallet_all_checks_ok,
+      "Account Query Api",
+      "healthy",
+      "not healthy"
+    )
+  );
 
   /**
    * Store results in Database
    */
   try {
     await database.manager.save(api);
-    childLogger.info("SAVED \t New Api validation to database for " + guild.name + " " +
+    childLogger.debug("SAVED \t New Api validation to database for " + guild.name + " " +
     (isMainnet ? "mainnet" : "testnet") +
     " to database");
   } catch (error) {
