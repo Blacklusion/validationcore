@@ -153,33 +153,35 @@ export async function validateAll(
       }
 
       // response contains recent eosio.ram action
-      if (
-        Array.isArray(response.getDataItem(["actions"])) &&
-        response.getDataItem(["actions"]).length >= 1 &&
-        response.getDataItem(["actions"])[0].block_time
-      ) {
-        let currentDate: number = Date.now();
-        // Use time of http request if available in order to avoid server or validation time delay
-        if (typeof response.headers.get("date") == "number") {
-          currentDate = new Date(response.headers.get("date")).getTime();
-        }
-        // "+00:00" is necessary for defining date as UTC
-        const timeDelta: number = new Date(response.getDataItem(["actions"])[0].block_time + "+00:00").getTime() - currentDate;
+      if (isMainnet) {
+        if (
+          Array.isArray(response.getDataItem(["actions"])) &&
+          response.getDataItem(["actions"]).length >= 1 &&
+          response.getDataItem(["actions"])[0].block_time
+        ) {
+          let currentDate: number = Date.now();
+          // Use time of http request if available in order to avoid server or validation time delay
+          if (typeof response.headers.get("date") == "number") {
+            currentDate = new Date(response.headers.get("date")).getTime();
+          }
+          // "+00:00" is necessary for defining date as UTC
+          const timeDelta: number = new Date(response.getDataItem(["actions"])[0].block_time + "+00:00").getTime() - currentDate;
 
-        // recent eosio.ram action is too old
-        if (!(Math.abs(timeDelta) < config.get("validation.history_actions_block_time_delta"))) {
-          historyActionsIncorrectMessage +=
-            ", last eosio.ram action older than " +
-            config.get("validation.history_actions_block_time_delta") / 60000 +
-            "min";
-          errorCounter++;
+          // recent eosio.ram action is too old
+          if (!(Math.abs(timeDelta) < config.get("validation.history_actions_block_time_delta"))) {
+            historyActionsIncorrectMessage +=
+              ", last eosio.ram action older than " +
+              config.get("validation.history_actions_block_time_delta") / 60000 +
+              "min";
+            errorCounter++;
+          }
         }
-      }
 
       // No block time was provided
       else {
         historyActionsIncorrectMessage += ", no block_time provided";
         errorCounter++;
+      }
       }
 
       // Status ok if all checks are passed
@@ -511,7 +513,7 @@ export async function validateAll(
 
         const missingBlocks = elastic.service_data.last_indexed_block - elastic.service_data.total_indexed_blocks;
         history.hyperion_health_missing_blocks = missingBlocks;
-        history.hyperion_health_total_indexed_blocks_ok = missingBlocks === 0;
+        history.hyperion_health_total_indexed_blocks_ok = missingBlocks <= config.get("validation.hyperion_tolerated_missing_blocks");
         indexBlocksIncorrectMessage = "total indexed block != last indexed block (missing " + missingBlocks + " blocks)"
       } else {
         indexBlocksIncorrectMessage = "total indexed blocks field not provided in /v2/health";

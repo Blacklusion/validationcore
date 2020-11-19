@@ -259,6 +259,7 @@ function checkConfig(): boolean {
     ["validation.api_head_block_time_delta", "number"],
     ["validation.history_transaction_offset", "number"],
     ["validation.history_actions_block_time_delta", "number"],
+    ["validation.hyperion_tolerated_missing_blocks", "number"],
     ["validation.hyperion_query_time_ms", "number"],
     ["validation.social_services", "array"],
     ["validation.performance_mode", "boolean"],
