@@ -8,10 +8,7 @@ import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/HttpRequest";
-import {
-  evaluateMessage,
-  convertArrayToJson
-} from "../messageHandler";
+import { evaluateMessage, convertArrayToJson } from "../messageHandler";
 
 /**
  * Logger Settings for Api
@@ -76,7 +73,7 @@ export async function validateAll(
       api.ssl_ok = false;
       sslMessage = "not ok, no https url provided";
     } else {
-      await http.get(apiEndpoint, "",  0).then((response) => {
+      await http.get(apiEndpoint, "", 0).then((response) => {
         if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
           api.ssl_ok = true;
         } else {
@@ -87,137 +84,151 @@ export async function validateAll(
     }
     validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
 
-    if (!api.ssl_ok)
-      failedRequestCounter++;
+    if (!api.ssl_ok) failedRequestCounter++;
   }
 
   /**
    * 1. Test: Basic Checks
    */
-  await http.post(apiEndpoint, "/v1/chain/get_info", {"json": true}, http.evaluatePerformanceMode(failedRequestCounter)).then((response) => {
-    api.get_info_ok = response.ok && response.isJson();
-    api.get_info_ms = response.elapsedTimeInMilliseconds;
+  await http
+    .post(apiEndpoint, "/v1/chain/get_info", { json: true }, http.evaluatePerformanceMode(failedRequestCounter))
+    .then((response) => {
+      api.get_info_ok = response.ok && response.isJson();
+      api.get_info_ms = response.elapsedTimeInMilliseconds;
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.get_info_ok,
-        api.get_info_ok,
-        "Get_info request",
-        "successful",
-        "not successful" + response.getFormattedErrorMessage()
-      )
-    );
+      validationMessages.push(
+        evaluateMessage(
+          lastValidation.get_info_ok,
+          api.get_info_ok,
+          "Get_info request",
+          "successful",
+          "not successful" + response.getFormattedErrorMessage()
+        )
+      );
 
-    if (!api.get_info_ok) {
-      failedRequestCounter++;
-      return;
-    }
-
-    /**
-     * Test 1.1: Server Version
-     */
-    const serverVersions: Array<string> = config.get(isMainnet ? "mainnet.server_versions" : "testnet.server_versions");
-    const serverVersion = response.getDataItem(["server_version_string"]) ? response.getDataItem(["server_version_string"]) : "unknown";
-    api.server_version_ok = serverVersions.includes(serverVersion);
-    api.server_version = response.getDataItem(["server_version_string"]);
-
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.server_version_ok,
-        api.server_version_ok,
-        "Server version " + serverVersion + " is",
-        "valid",
-        "invalid"
-      )
-    );
-
-    /**
-     * Test 1.2: Api for correct chain
-     */
-    api.correct_chain = typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
-
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.correct_chain,
-        api.correct_chain,
-        "Api is provided for the",
-        "correct chain",
-        "wrong chain"
-      )
-    );
-
-    /**
-     * Test 1.3: Head Block up to date
-     */
-    let headBlockIncorrectMessage = "";
-    if (typeof response.getDataItem(["head_block_time"]) === "string") {
-      // Get current time
-      let currentDate: number = Date.now();
-
-      // Use time of http request if available in order to avoid server or validation time delay
-      if (typeof response.headers.get("date") === "number") {
-        currentDate = new Date(response.headers.get("date")).getTime();
+      if (!api.get_info_ok) {
+        failedRequestCounter++;
+        return;
       }
 
-      // "+00:00" is necessary for defining date as UTC
-      const timeDelta: number = currentDate - new Date(response.getDataItem(["head_block_time"]) + "+00:00").getTime();
+      /**
+       * Test 1.1: Server Version
+       */
+      const serverVersions: Array<string> = config.get(
+        isMainnet ? "mainnet.server_versions" : "testnet.server_versions"
+      );
+      const serverVersion = response.getDataItem(["server_version_string"])
+        ? response.getDataItem(["server_version_string"])
+        : "unknown";
+      api.server_version_ok = serverVersions.includes(serverVersion);
+      api.server_version = response.getDataItem(["server_version_string"]);
 
-      // Check if headBlock is within the allowed delta
-      api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
-      api.head_block_delta_ms = timeDelta;
+      validationMessages.push(
+        evaluateMessage(
+          lastValidation.server_version_ok,
+          api.server_version_ok,
+          "Server version " + serverVersion + " is",
+          "valid",
+          "invalid"
+        )
+      );
 
-      // Format message if head block delta is not within the allowed range
-      if (!api.head_block_delta_ok) {
-        headBlockIncorrectMessage =
-          ": " +
-          timeDelta / 1000 +
-          "sec behind. Only a delta of " +
-          config.get("validation.api_head_block_time_delta") / 1000 +
-          "sec is tolerated";
+      /**
+       * Test 1.2: Api for correct chain
+       */
+      api.correct_chain =
+        typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
+
+      validationMessages.push(
+        evaluateMessage(
+          lastValidation.correct_chain,
+          api.correct_chain,
+          "Api is provided for the",
+          "correct chain",
+          "wrong chain"
+        )
+      );
+
+      /**
+       * Test 1.3: Head Block up to date
+       */
+      let headBlockIncorrectMessage = "";
+      if (typeof response.getDataItem(["head_block_time"]) === "string") {
+        // Get current time
+        let currentDate: number = Date.now();
+
+        // Use time of http request if available in order to avoid server or validation time delay
+        if (typeof response.headers.get("date") === "number") {
+          currentDate = new Date(response.headers.get("date")).getTime();
+        }
+
+        // "+00:00" is necessary for defining date as UTC
+        const timeDelta: number =
+          currentDate - new Date(response.getDataItem(["head_block_time"]) + "+00:00").getTime();
+
+        // Check if headBlock is within the allowed delta
+        api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
+        api.head_block_delta_ms = timeDelta;
+
+        // Format message if head block delta is not within the allowed range
+        if (!api.head_block_delta_ok) {
+          headBlockIncorrectMessage =
+            ": " +
+            timeDelta / 1000 +
+            "sec behind. Only a delta of " +
+            config.get("validation.api_head_block_time_delta") / 1000 +
+            "sec is tolerated";
+        }
+      } else {
+        api.head_block_delta_ok = false;
+        headBlockIncorrectMessage = ": could not be read from api";
       }
-    } else {
-      api.head_block_delta_ok = false;
-      headBlockIncorrectMessage = ": could not be read from api";
-    }
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.head_block_delta_ok,
-        api.head_block_delta_ok,
-        "Head block",
-        "is up-to-date",
-        "is not up-to-date" + headBlockIncorrectMessage
-      )
-    );
-  });
+      validationMessages.push(
+        evaluateMessage(
+          lastValidation.head_block_delta_ok,
+          api.head_block_delta_ok,
+          "Head block",
+          "is up-to-date",
+          "is not up-to-date" + headBlockIncorrectMessage
+        )
+      );
+    });
 
   /**
    * Test 2: Block one exists
    */
-  await http.post(apiEndpoint, "/v1/chain/get_block", {"block_num_or_id": 1, "json": true}, http.evaluatePerformanceMode(failedRequestCounter)).then((response) => {
-    api.block_one_ok = response.ok && response.isJson();
-    api.block_one_ms = response.elapsedTimeInMilliseconds;
+  await http
+    .post(
+      apiEndpoint,
+      "/v1/chain/get_block",
+      { block_num_or_id: 1, json: true },
+      http.evaluatePerformanceMode(failedRequestCounter)
+    )
+    .then((response) => {
+      api.block_one_ok = response.ok && response.isJson();
+      api.block_one_ms = response.elapsedTimeInMilliseconds;
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.block_one_ok,
-        api.block_one_ok,
-        "Block one test",
-        "passed",
-        "not passed" + response.getFormattedErrorMessage()
-      )
-    );
+      validationMessages.push(
+        evaluateMessage(
+          lastValidation.block_one_ok,
+          api.block_one_ok,
+          "Block one test",
+          "passed",
+          "not passed" + response.getFormattedErrorMessage()
+        )
+      );
 
-    if (!api.block_one_ok)
-      failedRequestCounter++;
-  });
+      if (!api.block_one_ok) failedRequestCounter++;
+    });
 
   /**
    * Test 3: Verbose Error
    */
-  await http.post(apiEndpoint, "/v1/chain/should_return_error", {"json": true}, 0).then((response) => {
+  await http.post(apiEndpoint, "/v1/chain/should_return_error", { json: true }, 0).then((response) => {
     api.verbose_error_ms = response.elapsedTimeInMilliseconds;
     // todo: ensure no check on undefined
-    api.verbose_error_ok = !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
+    api.verbose_error_ok =
+      !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
     validationMessages.push(
       evaluateMessage(
         lastValidation.verbose_error_ok,
@@ -228,8 +239,7 @@ export async function validateAll(
       )
     );
 
-    if (!api.verbose_error_ok)
-      failedRequestCounter++;
+    if (!api.verbose_error_ok) failedRequestCounter++;
   });
 
   /**
@@ -243,8 +253,10 @@ export async function validateAll(
       .post(
         apiEndpoint,
         "/v1/chain/get_block",
-        {"json": true, "block_num_or_id":
-          config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block") },
+        {
+          json: true,
+          block_num_or_id: config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block"),
+        },
         http.evaluatePerformanceMode(failedRequestCounter)
       )
       .then((response) => {
@@ -269,8 +281,7 @@ export async function validateAll(
           )
         );
 
-        if (!api.abi_serializer_ok)
-          failedRequestCounter++;
+        if (!api.abi_serializer_ok) failedRequestCounter++;
       });
   }
 
@@ -282,11 +293,11 @@ export async function validateAll(
       apiEndpoint,
       "/v1/chain/get_currency_balance",
       {
-        "json": true,
-        "account": config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account"),
-        "code": "eosio.token",
-        "symbol": config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol")
-        },
+        json: true,
+        account: config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account"),
+        code: "eosio.token",
+        symbol: config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol"),
+      },
       http.evaluatePerformanceMode(failedRequestCounter)
     )
     .then((response) => {
@@ -303,18 +314,18 @@ export async function validateAll(
         )
       );
 
-      if (!api.basic_symbol_ok)
-        failedRequestCounter++;
+      if (!api.basic_symbol_ok) failedRequestCounter++;
     });
 
   /**
    * Test 6: producer api disabled
    */
-  await http.get(apiEndpoint, "/v1/producer/get_integrity_hash",  0).then((response) => {
+  await http.get(apiEndpoint, "/v1/producer/get_integrity_hash", 0).then((response) => {
     // Set status in database
     api.producer_api_ms = response.elapsedTimeInMilliseconds;
     // Test should be successful if a html page is returned, hence !response.isJson()
-    api.producer_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+    api.producer_api_off =
+      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let producerApiIncorrectMessage = "is enabled. This feature should be disabled";
@@ -332,18 +343,18 @@ export async function validateAll(
       )
     );
 
-    if (!api.producer_api_off)
-      failedRequestCounter++;
+    if (!api.producer_api_off) failedRequestCounter++;
   });
 
   /**
    * Test 7: db_size api disabled
    */
-  await http.get(apiEndpoint, "/v1/db_size/get",  0).then((response) => {
+  await http.get(apiEndpoint, "/v1/db_size/get", 0).then((response) => {
     // Set status in database
     api.db_size_api_ms = response.elapsedTimeInMilliseconds;
     // Test should be successful if a html page is returned, hence !response.isJson()
-    api.db_size_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+    api.db_size_api_off =
+      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let dbSizeIncorrectMessage = "is enabled. This feature should be disabled";
@@ -361,18 +372,18 @@ export async function validateAll(
       )
     );
 
-    if(!api.db_size_api_off)
-      failedRequestCounter++;
+    if (!api.db_size_api_off) failedRequestCounter++;
   });
 
   /**
    * Test 8: net api disabled
    */
-  await http.get(apiEndpoint, "/v1/net/connections",  0).then((response) => {
+  await http.get(apiEndpoint, "/v1/net/connections", 0).then((response) => {
     // Set status in database
     api.net_api_ms = response.elapsedTimeInMilliseconds;
     // Test should be successful if a html page is returned, hence !response.isJson()
-    api.net_api_off = (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+    api.net_api_off =
+      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
 
     // Create error message
     let netApiIncorrectMessage = "is enabled. This feature should be disabled";
@@ -384,8 +395,7 @@ export async function validateAll(
       evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
     );
 
-    if (!api.net_api_off)
-      failedRequestCounter++;
+    if (!api.net_api_off) failedRequestCounter++;
   });
 
   /**
@@ -396,8 +406,8 @@ export async function validateAll(
       apiEndpoint,
       "/v1/chain/get_accounts_by_authorizers",
       {
-        "json": true,
-        "accounts": [ config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account") ]
+        json: true,
+        accounts: [config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account")],
       },
       http.evaluatePerformanceMode(failedRequestCounter)
     )
@@ -415,8 +425,7 @@ export async function validateAll(
         )
       );
 
-      if (!api.wallet_accounts_ok)
-        failedRequestCounter++;
+      if (!api.wallet_accounts_ok) failedRequestCounter++;
     });
 
   /**
@@ -427,8 +436,8 @@ export async function validateAll(
       apiEndpoint,
       "/v1/chain/get_accounts_by_authorizers",
       {
-        "json": true,
-        "keys": [ config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key") ]
+        json: true,
+        keys: [config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key")],
       },
       http.evaluatePerformanceMode(failedRequestCounter)
     )
@@ -446,11 +455,10 @@ export async function validateAll(
         )
       );
 
-      if (!api.wallet_keys_ok)
-        failedRequestCounter++;
+      if (!api.wallet_keys_ok) failedRequestCounter++;
     });
 
-  api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok
+  api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok;
 
   /**
    * Set all checks ok
@@ -464,11 +472,15 @@ export async function validateAll(
     api.block_one_ok &&
     api.block_one_ok &&
     api.verbose_error_ok &&
-    (config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") && config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count") ? api.abi_serializer_ok : true) &&
+    (config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") &&
+    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count")
+      ? api.abi_serializer_ok
+      : true) &&
     api.basic_symbol_ok &&
     api.producer_api_off &&
     api.db_size_api_off &&
-    api.net_api_off) {
+    api.net_api_off
+  ) {
     api.all_checks_ok = true;
   } else {
     api.all_checks_ok = false;
@@ -478,7 +490,7 @@ export async function validateAll(
    * Test History
    */
 
-  let history
+  let history;
   if (api.all_checks_ok) {
     history = await ValidateHistory.validateAll(
       guild,
@@ -497,26 +509,31 @@ export async function validateAll(
    * Validate if supplied features in bp.json are actually supported by Api
    */
   api.bp_json_all_features_ok = false;
-  let featuresIncorrectMessage = "were not provided"
+  let featuresIncorrectMessage = "were not provided";
   if (features !== undefined) {
-    featuresIncorrectMessage = "not ok"
+    featuresIncorrectMessage = "not ok";
     api.bp_json_all_features_ok = true;
 
-    const testedFeatures: [string, boolean][] = [["chain-api", api.all_checks_ok], ["account-query", api.wallet_all_checks_ok], ["history-v1", api.history_validation !== undefined && api.history_validation.history_all_checks_ok], ["hyperion-v2", api.history_validation !== undefined && api.history_validation.hyperion_all_checks_ok]]
+    const testedFeatures: [string, boolean][] = [
+      ["chain-api", api.all_checks_ok],
+      ["account-query", api.wallet_all_checks_ok],
+      ["history-v1", api.history_validation !== undefined && api.history_validation.history_all_checks_ok],
+      ["hyperion-v2", api.history_validation !== undefined && api.history_validation.hyperion_all_checks_ok],
+    ];
 
-    testedFeatures.forEach(feature => {
+    testedFeatures.forEach((feature) => {
       if (features.includes(feature[0])) {
         if (!feature[1]) {
           api.bp_json_all_features_ok = false;
-          featuresIncorrectMessage += ', "' + feature[0] + '" (not working, but was included in features array)'
+          featuresIncorrectMessage += ', "' + feature[0] + '" (not working, but was included in features array)';
         }
       } else {
         if (feature[1]) {
           api.bp_json_all_features_ok = false;
-          featuresIncorrectMessage += ', "' + feature[0] + '" (working, but was not not included in features array)'
+          featuresIncorrectMessage += ', "' + feature[0] + '" (working, but was not not included in features array)';
         }
       }
-    })
+    });
   }
 
   validationMessages.push(
@@ -530,13 +547,7 @@ export async function validateAll(
   );
 
   validationMessages.push(
-    evaluateMessage(
-      lastValidation.all_checks_ok,
-      api.all_checks_ok,
-      "Chain Api",
-      "healthy",
-      "not healthy"
-    )
+    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain Api", "healthy", "not healthy")
   );
 
   validationMessages.push(
@@ -554,9 +565,13 @@ export async function validateAll(
    */
   try {
     await database.manager.save(api);
-    childLogger.debug("SAVED \t New Api validation to database for " + guild.name + " " +
-    (isMainnet ? "mainnet" : "testnet") +
-    " to database");
+    childLogger.debug(
+      "SAVED \t New Api validation to database for " +
+        guild.name +
+        " " +
+        (isMainnet ? "mainnet" : "testnet") +
+        " to database"
+    );
   } catch (error) {
     childLogger.fatal("Error while saving new Api validation to database", error);
   }

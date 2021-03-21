@@ -14,7 +14,7 @@ import { logger } from "../common";
 export async function get(
   base: string,
   path = "",
-  retryCounter: number = config.get("validation.request_retry_count"),
+  retryCounter: number = config.get("validation.request_retry_count")
 ): Promise<HttpResponse> {
   return await request(base, path, retryCounter, true, undefined, undefined);
 }
@@ -71,7 +71,10 @@ async function request(
     const originalPath = new URL(base).pathname;
 
     if (originalPath.length >= 1 && path.length >= 1) {
-      const combinedPath = originalPath + (originalPath.charAt(originalPath.length - 1) === "/" ? "" : "/") + (path.charAt(0) === "/" ? path.substring(1, path.length) : path);
+      const combinedPath =
+        originalPath +
+        (originalPath.charAt(originalPath.length - 1) === "/" ? "" : "/") +
+        (path.charAt(0) === "/" ? path.substring(1, path.length) : path);
       urlWithPath = new URL(combinedPath, base);
     } else {
       urlWithPath = new URL(path, base);
@@ -97,7 +100,7 @@ async function request(
         response.parseFetchError(e);
       });
   } else {
-  const startTime = Date.now();
+    const startTime = Date.now();
     await timeout(
       fetch(urlWithPath, {
         method: "POST",
@@ -121,13 +124,13 @@ async function request(
   }
   // Retry request if not successful
   else {
-    logger.silly(urlWithPath + " => Retrying request (" + retryCounter + ")")
+    logger.silly(urlWithPath + " => Retrying request (" + retryCounter + ")");
 
     // Sleep in order to avoid potential problems with rate limits
     await sleep(config.get("validation.request_retry_pause_ms"));
 
     // Try again
-    return request(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType)
+    return request(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType);
   }
 }
 
@@ -156,11 +159,13 @@ function timeout(promise: Promise<any>): Promise<Response> {
 }
 
 export function evaluatePerformanceMode(failedRequests: number): number {
-  if (config.get("validation.performance_mode") && Math.max(0, config.get("validation.performance_mode_threshold")) <= failedRequests) {
-    logger.silly("Performance mode kicked in")
+  if (
+    config.get("validation.performance_mode") &&
+    Math.max(0, config.get("validation.performance_mode_threshold")) <= failedRequests
+  ) {
+    logger.silly("Performance mode kicked in");
     return 0;
-  }
-  else {
+  } else {
     return undefined;
   }
 }

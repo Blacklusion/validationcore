@@ -12,7 +12,7 @@ export class HttpResponse {
   data: string;
 
   // Data/Body of HttpResponse stored as Json Object
-  dataJson: any
+  dataJson: any;
 
   // ElapsedTime between the request was send and the response was received
   elapsedTimeInMilliseconds: number;
@@ -73,9 +73,9 @@ export class HttpResponse {
     }
 
     if (!this.ok) {
-      logger.silly(response.url + " => Request not successful" + this.getFormattedErrorMessage())
+      logger.silly(response.url + " => Request not successful" + this.getFormattedErrorMessage());
     } else {
-      logger.silly(response.url + " => Request successful")
+      logger.silly(response.url + " => Request successful");
     }
   }
 
@@ -114,7 +114,7 @@ export class HttpResponse {
       this.errorType = HttpErrorType.UNKNOWN;
     }
 
-    logger.debug("ERROR: Request not successful" + this.getFormattedErrorMessage())
+    logger.debug("ERROR: Request not successful" + this.getFormattedErrorMessage());
   }
 
   /**
@@ -150,17 +150,14 @@ export class HttpResponse {
    * @return {any} = the item that has been request. Undefined will be returned if no item was found, or the body is not json formatted
    */
   getDataItem(key: string[]): any {
-    if (!this.dataJson)
-      return undefined;
+    if (!this.dataJson) return undefined;
 
     let item = undefined;
     try {
       key.forEach((value, index) => {
-        if (index === 0)
-          item = this.dataJson[value];
-        else
-          item = item[value];
-      })
+        if (index === 0) item = this.dataJson[value];
+        else item = item[value];
+      });
       return item;
     } catch (e) {
       return undefined;

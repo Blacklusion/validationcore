@@ -39,8 +39,16 @@ function main() {
   if (!(config.has("general.pager_mode") ? config.get("general.pager_mode") : false))
     logger.warn("Pager mode is disabled. No pager messages will be sent.");
 
-  createConnection({type: "postgres", host: config.get("database.postgres_host"), port: config.get("database.postgres_port"), username: config.get("database.postgres_user"), password: config.get("database.postgres_password"), database: config.get("database.postgres_db"), entities: [__dirname + "/database/entity/*{.js,.ts}"],
-    synchronize: true})
+  createConnection({
+    type: "postgres",
+    host: config.get("database.postgres_host"),
+    port: config.get("database.postgres_port"),
+    username: config.get("database.postgres_user"),
+    password: config.get("database.postgres_password"),
+    database: config.get("database.postgres_db"),
+    entities: [__dirname + "/database/entity/*{.js,.ts}"],
+    synchronize: true,
+  })
     .then(async () => {
       logger.info("Successfully connected to database ");
 
@@ -96,41 +104,64 @@ async function validateAllGuilds() {
        * Validate Guild for Mainnet
        */
       if (guild.isMainnet) {
-
-        guildsArray.push(guild.name + "_main")
+        guildsArray.push(guild.name + "_main");
         guildCounter++;
-        const promise = validateAll(guild, true)
+        const promise = validateAll(guild, true);
         validationPromises.push(promise);
         promise.then(() => {
-          guildsArray = guildsArray.filter(x => x !== guild.name + "_main")
+          guildsArray = guildsArray.filter((x) => x !== guild.name + "_main");
           resolvedGuildCounter++;
-          logger.info("ROUND " + validationRoundCounterLocal + " - [" + resolvedGuildCounter + "/" + guildCounter + "] Finished evaluating guild " + guild.name + " mainnet"  + (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : ""))
-        })
+          logger.info(
+            "ROUND " +
+              validationRoundCounterLocal +
+              " - [" +
+              resolvedGuildCounter +
+              "/" +
+              guildCounter +
+              "] Finished evaluating guild " +
+              guild.name +
+              " mainnet" +
+              (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : "")
+          );
+        });
       }
 
       /**
        * Validate Guild for Testnet
        */
       if (guild.isTestnet) {
-        guildsArray.push(guild.name + "_test")
+        guildsArray.push(guild.name + "_test");
         guildCounter++;
-        const promise = validateAll(guild, false)
+        const promise = validateAll(guild, false);
         validationPromises.push(promise);
         promise.then(() => {
-          guildsArray = guildsArray.filter(x => x !== guild.name + "_test")
+          guildsArray = guildsArray.filter((x) => x !== guild.name + "_test");
           resolvedGuildCounter++;
-          logger.info("ROUND " + validationRoundCounterLocal + " - [" + resolvedGuildCounter + "/" + guildCounter + "] Finished evaluating guild " + guild.name + " testnet"  + (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : ""))
-        })
+          logger.info(
+            "ROUND " +
+              validationRoundCounterLocal +
+              " - [" +
+              resolvedGuildCounter +
+              "/" +
+              guildCounter +
+              "] Finished evaluating guild " +
+              guild.name +
+              " testnet" +
+              (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : "")
+          );
+        });
       }
     });
   });
 
   // Create Log output when all validations are finished
-  await Promise.all(validationPromises).then((x) => {
-    logger.info("VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
-  }).catch(e => {
-    logger.error("ERROR DURING VALIDATION ROUND (" + validationRoundCounterLocal + ")", e)
-  });
+  await Promise.all(validationPromises)
+    .then((x) => {
+      logger.info("VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
+    })
+    .catch((e) => {
+      logger.error("ERROR DURING VALIDATION ROUND (" + validationRoundCounterLocal + ")", e);
+    });
 
   return Promise.resolve(true);
 }
@@ -269,21 +300,20 @@ function checkConfig(): boolean {
     ["database.postgres_port", "number"],
     ["database.postgres_user", "string"],
     ["database.postgres_password", "string"],
-    ["database.postgres_db", "string"]
+    ["database.postgres_db", "string"],
   ];
 
   settings.forEach((setting) => {
     try {
-      const configItem = config.get(setting[0])
+      const configItem = config.get(setting[0]);
       if (setting[1] === "url") {
         try {
-          new URL(configItem)
+          new URL(configItem);
         } catch (e) {
           logger.error(setting[0] + " was provided. But it is not a valid url.");
           allVariablesSet = false;
         }
-      }
-      else if (
+      } else if (
         (setting[1] === "array" && !Array.isArray(configItem)) ||
         (setting[1] !== "array" && !(typeof configItem === setting[1]))
       ) {

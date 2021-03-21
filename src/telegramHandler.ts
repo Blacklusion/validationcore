@@ -85,39 +85,35 @@ function sendMessage(
   // Filter messages -> Inform user only about changes, but not about reoccurring problems
   // New filtered array uses a simple true/false structure instead of the messageState structure
   const filteredMessages: [string, boolean][] = [];
-  messages.forEach(message => {
+  messages.forEach((message) => {
     if (message[1] === messageState.fromTrueToFalse || message[1] === messageState.fromFalseToTrue) {
-      filteredMessages.push([message[0], message[1] === messageState.fromFalseToTrue])
+      filteredMessages.push([message[0], message[1] === messageState.fromFalseToTrue]);
     }
-  })
+  });
 
-  if (filteredMessages.length === 0)
-    return;
+  if (filteredMessages.length === 0) return;
 
   // Convert message Array to jsonArray
   const messagesJson = convertArrayToJson(filteredMessages);
 
   // Send messages to Telegram service
-  http.post(
-    url,
-    path,
-    {
-      "guild_name": guildName,
-      "isMainnet": isMainnet,
-      "headerMessage": headerMessage,
-      "messages": messagesJson
-    }
-  )
+  http
+    .post(url, path, {
+      guild_name: guildName,
+      isMainnet: isMainnet,
+      headerMessage: headerMessage,
+      messages: messagesJson,
+    })
     .then((response) => {
       if (response.ok) {
         logger.debug(path + "\t Successfully sent message for " + guildName);
       } else {
         logger.fatal(
           "Telegram message for " +
-          guildName +
-          " could not be sent. All subscribers for that guild have not received a message!",
+            guildName +
+            " could not be sent. All subscribers for that guild have not received a message!",
           response.errorMessage
         );
       }
-    })
+    });
 }

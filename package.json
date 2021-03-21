@@ -18,14 +18,14 @@
     "@types/jquery": "^3.5.1",
     "config": "^3.3.1",
     "eosio-protocol": "Blacklusion/eosio-protocol#with-dist",
-    "pg": "^8.3.3",
-    "reflect-metadata": "^0.1.10",
-    "toml": "^3.0.0",
-    "tslog": "^2.8.0",
-    "typeorm": "0.2.25",
     "eosjs": "^21.0.3",
     "node-fetch": "^2.6.1",
-    "stream": "^0.0.2"
+    "pg": "^8.3.3",
+    "reflect-metadata": "^0.1.10",
+    "stream": "^0.0.2",
+    "toml": "^3.0.0",
+    "tslog": "^2.8.0",
+    "typeorm": "0.2.25"
   },
   "keywords": [
     "blacklusion pager",

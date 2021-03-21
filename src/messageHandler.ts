@@ -20,10 +20,17 @@ export function evaluateMessage(
   correctMessage: string,
   incorrectMessage: string
 ): [string, number] {
-
   // Check if new Validation was not assigned before calling method -> This would indicate a malfunctioning validation
   if (newValidation == null) {
-    logger.warn("NewValidation is null. This should not be the case. Check code. Message: (" + message + " " + correctMessage + " / " + incorrectMessage + ")");
+    logger.warn(
+      "NewValidation is null. This should not be the case. Check code. Message: (" +
+        message +
+        " " +
+        correctMessage +
+        " / " +
+        incorrectMessage +
+        ")"
+    );
   }
 
   /**
@@ -43,7 +50,7 @@ export function evaluateMessage(
   } else {
     // Old and new Validation are BOTH false or undefined -> Unchanged
     if (newValidation) {
-      state = messageState.fromFalseToTrue
+      state = messageState.fromFalseToTrue;
     }
     // Old Validation was false or undefined and new Validation is true -> Changed
     else {
@@ -51,7 +58,14 @@ export function evaluateMessage(
     }
   }
 
-  return [message + ((message && message.length > 0) ? " " : "") + ((state === messageState.fromTrueToTrue || state === messageState.fromFalseToTrue)? correctMessage : incorrectMessage), state]
+  return [
+    message +
+      (message && message.length > 0 ? " " : "") +
+      (state === messageState.fromTrueToTrue || state === messageState.fromFalseToTrue
+        ? correctMessage
+        : incorrectMessage),
+    state,
+  ];
 }
 
 /**
@@ -64,12 +78,11 @@ export function convertArrayToJson(array: [string, any][], endpoint: string = un
   const json = {};
 
   // Add Endpoint at top if provided
-  if (endpoint !== undefined)
-    json["endpoint"] = endpoint;
+  if (endpoint !== undefined) json["endpoint"] = endpoint;
 
   // Add all messages as provided in the array to json
   array.forEach((value) => {
-    json[value[0]] = value[1]
+    json[value[0]] = value[1];
   });
 
   return json;
@@ -96,9 +109,9 @@ export async function writeJsonToDisk(guild: string, isMainnet: boolean, content
  * Properly storing the message state is important, because the goal is to store all messages as json (regardless if true or false)
  * But at the same time the user will only be informed about messages that have changed (therefore no messages will be sent for TrueToTrue and FalseToFalse)
  */
-export enum messageState{
+export enum messageState {
   fromTrueToTrue,
   fromTrueToFalse,
   fromFalseToTrue,
-  fromFalseToFalse
+  fromFalseToFalse,
 }

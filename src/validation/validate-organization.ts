@@ -36,7 +36,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   const validationMessages: Array<[string, number]> = [];
 
   // After each validation a json with all validation messages is stored to disk
-  const guildJson = {}
+  const guildJson = {};
   guildJson["guild"] = guild.name;
   guildJson["validation_date"] = new Date();
   guildJson["isMainnet"] = isMainnet;
@@ -143,8 +143,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
      */
     // todo: check for double headers
     // Set status in database
-    organization.chains_json_access_control_header_ok = response.headers !== undefined &&
-      response.headers.has("access-control-allow-origin") && response.headers.get("access-control-allow-origin") === "*";
+    organization.chains_json_access_control_header_ok =
+      response.headers !== undefined &&
+      response.headers.has("access-control-allow-origin") &&
+      response.headers.get("access-control-allow-origin") === "*";
 
     // Create Explanation for Pager Messages and locally stored .json
     validationMessages.push(
@@ -160,7 +162,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
     /**
      * Get path to bp.json
      */
-    if (response.getDataItem(["chains", chainId]) !== undefined && new RegExp(".*\\.json").test(response.getDataItem(["chains", chainId]))) {
+    if (
+      response.getDataItem(["chains", chainId]) !== undefined &&
+      new RegExp(".*\\.json").test(response.getDataItem(["chains", chainId]))
+    ) {
       pathToBpJson = response.getDataItem(["chains", chainId]);
     }
   });
@@ -191,7 +196,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       // todo: improve regex to support max length and only valid characters
       let producerNameMessage = "was not provided";
       // A valid producer_account_name is provided in bp.json
-      if (response.getDataItem(["producer_account_name"]) !== undefined && new RegExp(".+").test(response.getDataItem(["producer_account_name"]))) {
+      if (
+        response.getDataItem(["producer_account_name"]) !== undefined &&
+        new RegExp(".+").test(response.getDataItem(["producer_account_name"]))
+      ) {
         // producer_account_name matches name provided on chain
         if (response.getDataItem(["producer_account_name"]) === guild.name) {
           // todo: check case sensitivity
@@ -200,7 +208,11 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         } else {
           organization.bpjson_producer_account_name_ok = false;
           producerNameMessage =
-            "(" + response.getDataItem(["producer_account_name"]) + ") does not match name on chain (" + guild.name + ")";
+            "(" +
+            response.getDataItem(["producer_account_name"]) +
+            ") does not match name on chain (" +
+            guild.name +
+            ")";
         }
         // There is no valid producer_account_name in the bp.json
       } else {
@@ -240,69 +252,68 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.3: website
        */
-        await http.get(response.getDataItem(["org","website"])).then((response) => {
-          organization.bpjson_website_ok = response.ok;
-          organization.bpjson_website_ms = response.elapsedTimeInMilliseconds;
+      await http.get(response.getDataItem(["org", "website"])).then((response) => {
+        organization.bpjson_website_ok = response.ok;
+        organization.bpjson_website_ms = response.elapsedTimeInMilliseconds;
 
-          // Create Explanation for Pager Messages and locally stored .json
-          validationMessages.push(
-            evaluateMessage(
-              lastValidation.bpjson_candidate_name_ok,
-              organization.bpjson_candidate_name_ok,
-              "Website in " + pathToBpJson,
-              "is reachable",
-              "is not reachable" + response.getFormattedErrorMessage()
-            )
-          );
-        });
+        // Create Explanation for Pager Messages and locally stored .json
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_candidate_name_ok,
+            organization.bpjson_candidate_name_ok,
+            "Website in " + pathToBpJson,
+            "is reachable",
+            "is not reachable" + response.getFormattedErrorMessage()
+          )
+        );
+      });
 
       /**
        * Test 3.4: Code of conduct
        */
-        await http.get(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
-          organization.bpjson_code_of_conduct_ok = response.ok;
-          organization.bpjson_code_of_conduct_ms = response.elapsedTimeInMilliseconds;
+      await http.get(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
+        organization.bpjson_code_of_conduct_ok = response.ok;
+        organization.bpjson_code_of_conduct_ms = response.elapsedTimeInMilliseconds;
 
-          // Create Explanation for Pager Messages and locally stored .json
-          validationMessages.push(
-            evaluateMessage(
-              lastValidation.bpjson_code_of_conduct_ok,
-              organization.bpjson_code_of_conduct_ok,
-              "Code of conduct in " + pathToBpJson,
-              "is reachable.",
-              "is not reachable" + response.getFormattedErrorMessage()
-            )
-          );
-        });
+        // Create Explanation for Pager Messages and locally stored .json
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_code_of_conduct_ok,
+            organization.bpjson_code_of_conduct_ok,
+            "Code of conduct in " + pathToBpJson,
+            "is reachable.",
+            "is not reachable" + response.getFormattedErrorMessage()
+          )
+        );
+      });
 
       /**
        * Test 3.5: Ownership Disclosure
        */
-        await http.get(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
-          organization.bpjson_ownership_disclosure_ok = response.ok;
-          organization.bpjson_ownership_disclosure_ms = response.elapsedTimeInMilliseconds;
+      await http.get(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
+        organization.bpjson_ownership_disclosure_ok = response.ok;
+        organization.bpjson_ownership_disclosure_ms = response.elapsedTimeInMilliseconds;
 
-          // Create Explanation for Pager Messages and locally stored .json
-          validationMessages.push(
-            evaluateMessage(
-              lastValidation.bpjson_ownership_disclosure_ok,
-              organization.bpjson_ownership_disclosure_ok,
-              "Ownership Disclosure in " + pathToBpJson,
-              "is reachable",
-              "is not reachable" + response.getFormattedErrorMessage()
-            )
-          );
-        });
+        // Create Explanation for Pager Messages and locally stored .json
+        validationMessages.push(
+          evaluateMessage(
+            lastValidation.bpjson_ownership_disclosure_ok,
+            organization.bpjson_ownership_disclosure_ok,
+            "Ownership Disclosure in " + pathToBpJson,
+            "is reachable",
+            "is not reachable" + response.getFormattedErrorMessage()
+          )
+        );
+      });
 
       /**
        * Test 3.6: email
        */
       let emailIncorrectMessage = "";
       // Valid email field in bp.json
-      if (response.getDataItem(["org","email"]) !== undefined) {
+      if (response.getDataItem(["org", "email"]) !== undefined) {
         // Check if email if formatted correctly
-        organization.bpjson_email_ok =
-          new RegExp(".+@.+\\..+").test(response.getDataItem(["org","email"]));
+        organization.bpjson_email_ok = new RegExp(".+@.+\\..+").test(response.getDataItem(["org", "email"]));
 
         if (!organization.bpjson_email_ok)
           emailIncorrectMessage = "has an invalid format: " + response.getDataItem(["org", "email"]);
@@ -357,7 +368,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             }
           }
 
-          gitHubUserIncorrectMessage += ")"
+          gitHubUserIncorrectMessage += ")";
 
           // One GitHub user supplied
         } else {
@@ -366,7 +377,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             !new RegExp("https?://.+").test(gitHubUserObj.toLowerCase()) &&
             !new RegExp("^@").test(gitHubUserObj);
 
-            gitHubUserIncorrectMessage = "was provided, but has invalid formatting (" + gitHubUserObj + ")";
+          gitHubUserIncorrectMessage = "was provided, but has invalid formatting (" + gitHubUserObj + ")";
         }
       } else {
         gitHubUserIncorrectMessage = "was not provided";
@@ -394,14 +405,14 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
           organization.bpjson_chain_resources_ok = true;
         } catch (e) {
           organization.bpjson_chain_resources_ok = false;
-          chainResourcesIncorrectMessage = "is not a valid url"
+          chainResourcesIncorrectMessage = "is not a valid url";
 
           if (Array.isArray(response.getDataItem(["org", "chain_resources"])))
-            chainResourcesIncorrectMessage += ". Arrays are not allowed"
+            chainResourcesIncorrectMessage += ". Arrays are not allowed";
         }
       } else {
         organization.bpjson_chain_resources_ok = false;
-        chainResourcesIncorrectMessage = "was not provided"
+        chainResourcesIncorrectMessage = "was not provided";
       }
 
       // Create Explanation for Pager Messages and locally stored .json
@@ -428,9 +439,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             try {
               new URL(resource);
             } catch (e) {
-
-                if (!organization.bpjson_other_resources_ok)
-                  otherResourcesIncorrectMessage += ", "
+              if (!organization.bpjson_other_resources_ok) otherResourcesIncorrectMessage += ", ";
 
               otherResourcesIncorrectMessage += resource + "(invalid url)";
               organization.bpjson_other_resources_ok = false;
@@ -441,7 +450,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
           organization.bpjson_other_resources_ok = false;
         }
       } else {
-        otherResourcesIncorrectMessage = "were not provided"
+        otherResourcesIncorrectMessage = "were not provided";
         organization.bpjson_other_resources_ok = false;
       }
       // Create Explanation for Pager Messages and locally stored .json
@@ -460,7 +469,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
        */
       let brandingIncorrectMessage = "invalid";
       // todo: check if array check is necessary
-      if (response.getDataItem(["org", "branding"]) !== undefined && Object.keys(response.getDataItem(["org", "branding"])).length >= 3) {
+      if (
+        response.getDataItem(["org", "branding"]) !== undefined &&
+        Object.keys(response.getDataItem(["org", "branding"])).length >= 3
+      ) {
         let successfulBrandingRequests = 0;
         // Logo 256px
         await http.get(response.getDataItem(["org", "branding", "logo_256"])).then((response) => {
@@ -531,7 +543,9 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       /**
        * Test 3.8: location
        */
-      organization.bpjson_location_ok = response.getDataItem(["org", "location"]) !== undefined && validateBpLocation(response.getDataItem(["org", "location"]));
+      organization.bpjson_location_ok =
+        response.getDataItem(["org", "location"]) !== undefined &&
+        validateBpLocation(response.getDataItem(["org", "location"]));
 
       // Create Explanation for Pager Messages and locally stored .json
       validationMessages.push(
@@ -596,7 +610,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             /**
              * Test 3.11: Check if producer is listed
              */
-            if (node.node_type == "producer" || (Array.isArray(node.node_type) && node.node_type.includes("producer"))) {
+            if (
+              node.node_type == "producer" ||
+              (Array.isArray(node.node_type) && node.node_type.includes("producer"))
+            ) {
               if (!organization.nodes_producer_found) organization.nodes_producer_found = locationOk;
             }
             if (node.node_type == "seed" || (Array.isArray(node.node_type) && node.node_type.includes("seed"))) {
@@ -669,8 +686,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 apiJsons.push(apiNode[1]);
 
                 // Add History validation message to history json array
-                if (apiNode[2])
-                historyJsons.push(apiNode[2]);
+                if (apiNode[2]) historyJsons.push(apiNode[2]);
               }
 
               // Validate Https endpoint
@@ -693,8 +709,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 apiJsons.push(sslNode[1]);
 
                 // Add History validation message to history json array
-                if (sslNode[2])
-                historyJsons.push(sslNode[2]);
+                if (sslNode[2]) historyJsons.push(sslNode[2]);
               }
             }
           }
@@ -761,7 +776,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   guildJson["organization"] = convertArrayToJson(validationMessages);
   guildJson["api_nodes"] = apiJsons;
   guildJson["history_nodes"] = historyJsons;
-  guildJson["seed_nodes"] = seedJsons
+  guildJson["seed_nodes"] = seedJsons;
   await writeJsonToDisk(guild.name, isMainnet, JSON.stringify(guildJson));
 
   // It must be returned a dummy promise, so the parent function calling this function waits until all validations are completed

@@ -28,10 +28,10 @@ import { convertArrayToJson, evaluateMessage } from "../messageHandler";
  * Logger Settings for Organization
  */
 const childLogger: Logger = logger.getChildLogger({
-  name: "P2P-Validation"
+  name: "P2P-Validation",
 });
 
-const configLoggingLevel = config.get("general.logging_level")
+const configLoggingLevel = config.get("general.logging_level");
 const debug = configLoggingLevel === "silly" || configLoggingLevel === "trace";
 
 class TestRunner {
@@ -315,7 +315,8 @@ export async function validateAll(
   /**
    * Test 1: Check url
    */
-  seed.p2p_endpoint_address_ok = !(new RegExp("^https?:\\/\\/").test(p2pEndpoint)) && new RegExp(".+:[0-9]+").test(p2pEndpoint)
+  seed.p2p_endpoint_address_ok =
+    !new RegExp("^https?:\\/\\/").test(p2pEndpoint) && new RegExp(".+:[0-9]+").test(p2pEndpoint);
   validationMessages.push(
     evaluateMessage(
       lastValidation.p2p_endpoint_address_ok,
@@ -326,8 +327,7 @@ export async function validateAll(
     )
   );
 
-  if (!seed.p2p_endpoint_address_ok)
-    return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
+  if (!seed.p2p_endpoint_address_ok) return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
 
   /**
    * 2. Create Seed Connection
@@ -394,13 +394,7 @@ export async function validateAll(
   seed.all_checks_ok = seed.p2p_endpoint_address_ok && seed.p2p_connection_possible && seed.block_transmission_speed_ok;
 
   validationMessages.push(
-    evaluateMessage(
-      lastValidation.all_checks_ok,
-      seed.all_checks_ok,
-      "Seed Node is",
-      "healthy",
-      "not healthy"
-    )
+    evaluateMessage(lastValidation.all_checks_ok, seed.all_checks_ok, "Seed Node is", "healthy", "not healthy")
   );
 
   /**
@@ -408,9 +402,13 @@ export async function validateAll(
    */
   try {
     await database.manager.save(seed);
-    childLogger.debug("SAVED \t New Seed validation to database for " + guild.name + " " +
-      (isMainnet ? "mainnet" : "testnet") +
-      " to database");
+    childLogger.debug(
+      "SAVED \t New Seed validation to database for " +
+        guild.name +
+        " " +
+        (isMainnet ? "mainnet" : "testnet") +
+        " to database"
+    );
   } catch (error) {
     childLogger.fatal("Error while saving new Seed validation to database", error);
   }
