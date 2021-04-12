@@ -23,7 +23,7 @@ function main() {
       "| |/ / /_/ / / / /_/ / /_/ / /_/ / /_/ / / / / /__/ /_/ / /  /  __/   | |/ / __/ \n" +
       "|___/\\__,_/_/_/\\__,_/\\__,_/\\__/_/\\____/_/ /_/\\___/\\____/_/   \\___/    |___/____/"
   );
-  console.log("    by Blacklusion - 2020\n\n");
+  console.log("    by Blacklusion - 2021\n\n");
 
   logger.info("Starting up " + config.get("general.name") + "...");
 
@@ -58,7 +58,7 @@ function main() {
        * Initialize interval based validations
        */
       validateAllGuilds();
-      setInterval(validateAllGuilds, 600000);
+      setInterval(validateAllGuilds, config.get("validation.validation_round_interval"));
     })
     .catch((error) => {
       logger.error("Error while connecting to database ", error);
@@ -281,6 +281,13 @@ function checkConfig(): boolean {
     ["testnet.api_currency_symbol", "string"],
     ["testnet.api_test_account", "string"],
 
+
+    ["validation.validation_round_interval", "number"],
+    ["validation.validation_organization_offset", "number"],
+    ["validation.validation_api_offset", "number"],
+    ["validation.validation_seed_offset", "number"],
+    ["validation.validation_history_offset", "number"],
+    ["validation.validation_atomic_offset", "number"],
     ["validation.request_retry_count", "number"],
     ["validation.request_retry_pause_ms", "number"],
     ["validation.request_timeout_ms", "number"],
