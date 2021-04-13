@@ -441,3 +441,39 @@ function createHistoryMessages() {
     )
   );
 }
+
+function createSeedMessage() {
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.p2p_endpoint_address_ok,
+      seed.p2p_endpoint_address_ok,
+      "Provided P2P address",
+      "valid",
+      "invalid"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.block_transmission_speed_ok,
+      seed.block_transmission_speed_ok,
+      "Block transmission speed is",
+      "OK",
+      "too slow"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.p2p_connection_possible,
+      seed.p2p_connection_possible,
+      "P2P connection was",
+      "possible",
+      "not possible" + message
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(lastValidation.all_checks_ok, seed.all_checks_ok, "Seed Node is", "healthy", "not healthy")
+  );
+}

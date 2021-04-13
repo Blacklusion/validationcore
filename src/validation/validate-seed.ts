@@ -284,23 +284,20 @@ class BlockTransmissionTestRunner extends TestRunner {
 /**
  *
  * @param {Guild} guild = guild for which the Seed is validated (must be tracked in database)
- * @param {Seed} lastValidation = last validation of the SAME P2P Endpoint
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  * @param {string} p2pEndpoint = url of the p2p endpoint
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
  */
 export async function validateAll(
   guild: Guild,
-  lastValidation: Seed,
   isMainnet: boolean,
   p2pEndpoint: string,
   locationOk: boolean
-): Promise<[Seed, string]> {
+): Promise<Seed> {
   if (!p2pEndpoint) return undefined;
 
   // Set general variables
   const api: string = isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint");
-  let validationMessages: Array<[string, number]> = [];
 
   // Create seed object for database
   const database = getConnection();
@@ -310,24 +307,13 @@ export async function validateAll(
   seed.location_ok = locationOk;
   seed.p2p_endpoint = p2pEndpoint;
 
-  if (!lastValidation) lastValidation = new Seed();
-
   /**
    * Test 1: Check url
    */
   seed.p2p_endpoint_address_ok =
     !new RegExp("^https?:\\/\\/").test(p2pEndpoint) && new RegExp(".+:[0-9]+").test(p2pEndpoint);
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.p2p_endpoint_address_ok,
-      seed.p2p_endpoint_address_ok,
-      "Provided P2P address",
-      "valid",
-      "invalid"
-    )
-  );
 
-  if (!seed.p2p_endpoint_address_ok) return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
+  if (!seed.p2p_endpoint_address_ok) return seed;
 
   /**
    * 2. Create Seed Connection
@@ -359,29 +345,11 @@ export async function validateAll(
         } else {
           seed.block_transmission_speed_ok = false;
         }
-
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.block_transmission_speed_ok,
-            seed.block_transmission_speed_ok,
-            "Block transmission speed is",
-            "OK",
-            "too slow"
-          )
-        );
       } else {
         seed.p2p_connection_possible = false;
       }
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.p2p_connection_possible,
-          seed.p2p_connection_possible,
-          "P2P connection was",
-          "possible",
-          "not possible" + (result.error_detail ? ": " + result.error_detail : "")
-        )
-      );
+      seed.p2p_connection_possible_message = (result.error_detail ? ": " + result.error_detail : "");
     })
     .catch((error) => {
       // todo: improve error handling, test with block_count =  "10"
@@ -392,10 +360,6 @@ export async function validateAll(
    * All checks ok
    */
   seed.all_checks_ok = seed.p2p_endpoint_address_ok && seed.p2p_connection_possible && seed.block_transmission_speed_ok;
-
-  validationMessages.push(
-    evaluateMessage(lastValidation.all_checks_ok, seed.all_checks_ok, "Seed Node is", "healthy", "not healthy")
-  );
 
   /**
    * Store results in Database
@@ -413,10 +377,5 @@ export async function validateAll(
     childLogger.fatal("Error while saving new Seed validation to database", error);
   }
 
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageSeed(guild.name, isMainnet, p2pEndpoint, validationMessages);
-
-  return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
+  return seed;
 }
