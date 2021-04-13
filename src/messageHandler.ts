@@ -267,3 +267,177 @@ function createApiMessages() {
     )
   );
 }
+
+function createHistoryMessages() {
+  validationMessages.push(evaluateMessage(lastValidation.ssl_ok, history.ssl_ok, "TLS", "ok", sslMessage));
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.history_transaction_ok,
+      history.history_transaction_ok,
+      "History get_transaction test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.history_actions_ok,
+      history.history_actions_ok,
+      "History get_actions test",
+      "passed",
+      "not passed" + historyActionsIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.history_key_accounts_ok,
+      history.history_key_accounts_ok,
+      "History get_key_accounts test",
+      "passed",
+      "not passed" + historyKeyIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_found,
+      history.hyperion_health_found,
+      "Hyperion /v2/health",
+      "found",
+      "not found" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_version_ok,
+      history.hyperion_health_version_ok,
+      "Hyperion version",
+      "provided in /v2/health",
+      "not provided in /v2/health"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_host_ok,
+      history.hyperion_health_host_ok,
+      "Hyperion host",
+      "provided in /v2/health",
+      "not provided in /v2/health"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_query_time_ok,
+      history.hyperion_health_query_time_ok,
+      "Hyperion query time",
+      "ok",
+      queryTimeIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_all_features_ok,
+      history.hyperion_health_all_features_ok,
+      "Hyperion features",
+      "ok",
+      "not ok" + featureIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_nodeosrpc_ok,
+      history.hyperion_health_nodeosrpc_ok,
+      "Hyperion NodesRpc status",
+      "ok",
+      nodeosRpcIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_rabbitmq_ok,
+      history.hyperion_health_rabbitmq_ok,
+      "Hyperion RabbitMq status",
+      "ok",
+      "not ok"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_elastic_ok,
+      history.hyperion_health_elastic_ok,
+      "Hyperion Elastic status",
+      "ok",
+      "not ok"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_health_total_indexed_blocks_ok,
+      history.hyperion_health_total_indexed_blocks_ok,
+      "Hyperion",
+      "total indexed block == last indexed block",
+      indexBlocksIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_transaction_ok,
+      history.hyperion_transaction_ok,
+      "Hyperion get_transaction test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_actions_ok,
+      history.hyperion_actions_ok,
+      "Hyperion get_actions test",
+      "passed",
+      "not passed" + hyperionActionsIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_key_accounts_ok,
+      history.hyperion_key_accounts_ok,
+      "Hyperion get_key_accounts test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.history_all_checks_ok,
+      history.history_all_checks_ok,
+      "History /v1/history is",
+      "healthy",
+      "not healthy"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.hyperion_all_checks_ok,
+      history.hyperion_all_checks_ok,
+      "Hyperion /v2/history is",
+      "healthy",
+      "not healthy"
+    )
+  );
+}

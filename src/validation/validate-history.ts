@@ -4,10 +4,8 @@ import * as config from "config";
 import { Logger } from "tslog";
 import { History } from "../database/entity/History";
 import { getConnection } from "typeorm";
-import { sendMessageHistory } from "../telegramHandler";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as http from "../httpConnection/HttpRequest";
-import { convertArrayToJson, evaluateMessage } from "../messageHandler";
 
 /**
  * Logger Settings for History
@@ -20,17 +18,15 @@ const childLogger: Logger = logger.getChildLogger({
  * Performs all validations of the History & Hyperion
  * @param {Guild} guild = guild for which the History is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
- * @param {History} lastValidation = last validation of the SAME History Endpoint
  * @param {string} apiEndpoint = url of the api node (http and https possible)
  * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
  */
 export async function validateAll(
   guild: Guild,
   isMainnet: boolean,
-  lastValidation: History,
   apiEndpoint: string,
   isSsl: boolean
-): Promise<[History, any]> {
+): Promise<History> {
   if (!apiEndpoint) return undefined;
 
   // Counts how many requests have failed. If performance mode is enabled, future requests may not be performed, if to many requests already failed
@@ -38,15 +34,12 @@ export async function validateAll(
 
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
 
-  let validationMessages: Array<[string, number]> = [];
-
+  // Create history object for database
   const database = getConnection();
   const history: History = new History();
   history.guild = guild.name;
   history.api_endpoint = apiEndpoint;
   history.validation_is_mainnet = isMainnet;
-
-  if (!lastValidation) lastValidation = new History();
 
   /**
    * SSL Check
@@ -67,8 +60,7 @@ export async function validateAll(
         }
       });
     }
-    validationMessages.push(evaluateMessage(lastValidation.ssl_ok, history.ssl_ok, "TLS", "ok", sslMessage));
-
+    history.ssl_message = sslMessage;
     if (!history.ssl_ok) failedRequestCounter++;
   }
 
@@ -92,16 +84,7 @@ export async function validateAll(
     .then((response) => {
       history.history_transaction_ok = response.ok && response.isJson();
       history.history_transaction_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.history_transaction_ok,
-          history.history_transaction_ok,
-          "History get_transaction test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      history.history_transaction_message = response.getFormattedErrorMessage();
 
       if (!history.history_transaction_ok) failedRequestCounter++;
     });
@@ -124,7 +107,7 @@ export async function validateAll(
     )
     .then((response) => {
       history.history_actions_ms = response.elapsedTimeInMilliseconds;
-      let errorCounter = 0;
+      let errorCounterLocal = 0;
 
       // Request was not successful
       if (!response.ok || (response.ok && !response.isJson())) {
@@ -133,7 +116,7 @@ export async function validateAll(
         return;
       }
 
-      // response does not contain correct number of actions
+      // Response does not contain correct number of actions
       if (
         !(
           Array.isArray(response.getDataItem(["actions"])) &&
@@ -141,16 +124,16 @@ export async function validateAll(
         )
       ) {
         historyActionsIncorrectMessage += ", returned incorrect number of actions";
-        errorCounter++;
+        errorCounterLocal++;
       }
 
-      // response does not contain last_irreversible_block
+      // Response does not contain last_irreversible_block
       if (!response.getDataItem(["last_irreversible_block"])) {
         historyActionsIncorrectMessage += ", last irreversible block not provided";
-        errorCounter++;
+        errorCounterLocal++;
       }
 
-      // response contains recent eosio.ram action
+      // Response contains recent eosio.ram action
       if (isMainnet) {
         if (
           Array.isArray(response.getDataItem(["actions"])) &&
@@ -172,30 +155,21 @@ export async function validateAll(
               ", last eosio.ram action older than " +
               config.get("validation.history_actions_block_time_delta") / 60000 +
               "min";
-            errorCounter++;
+            errorCounterLocal++;
           }
         }
 
         // No block time was provided
         else {
           historyActionsIncorrectMessage += ", no block_time provided";
-          errorCounter++;
+          errorCounterLocal++;
         }
       }
 
       // Status ok if all checks are passed
-      history.history_actions_ok = errorCounter == 0;
+      history.history_actions_ok = errorCounterLocal == 0;
     });
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.history_actions_ok,
-      history.history_actions_ok,
-      "History get_actions test",
-      "passed",
-      "not passed" + historyActionsIncorrectMessage
-    )
-  );
-
+  history.history_actions_message = historyActionsIncorrectMessage;
   if (!history.history_actions_ok) failedRequestCounter++;
 
   /**
@@ -222,40 +196,22 @@ export async function validateAll(
         history.history_key_accounts_ok = response.isJson() && response.getDataItem(["account_names"]) !== undefined;
       }
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.history_key_accounts_ok,
-          history.history_key_accounts_ok,
-          "History get_key_accounts test",
-          "passed",
-          "not passed" + historyKeyIncorrectMessage
-        )
-      );
-
+      history.history_key_accounts_message = historyKeyIncorrectMessage;
       if (!history.history_key_accounts_ok) failedRequestCounter++;
     });
 
-  // Reset failedRequestCounter for upcoming Hyperion tests
-  failedRequestCounter = 0;
   /**
    * 2. HYPERION
    */
+  // Reset failedRequestCounter for upcoming Hyperion tests
+  failedRequestCounter = 0;
 
   /**
    * Test 2.1 Hyperion Health
    */
   await http.get(apiEndpoint, "/v2/health", http.evaluatePerformanceMode(failedRequestCounter)).then((response) => {
     history.hyperion_health_found = response.ok && response.isJson();
-
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_found,
-        history.hyperion_health_found,
-        "Hyperion /v2/health",
-        "found",
-        "not found" + response.getFormattedErrorMessage()
-      )
-    );
+    history.hyperion_health_found_message = response.getFormattedErrorMessage();
 
     if (!history.hyperion_health_found) {
       failedRequestCounter++;
@@ -264,27 +220,9 @@ export async function validateAll(
 
     // Test 2.1.1 Health version
     history.hyperion_health_version_ok = response.getDataItem(["version"]) !== undefined;
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_version_ok,
-        history.hyperion_health_version_ok,
-        "Hyperion version",
-        "provided in /v2/health",
-        "not provided in /v2/health"
-      )
-    );
 
     // Test 2.1.2 Health Host
     history.hyperion_health_host_ok = response.getDataItem(["host"]) !== undefined;
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_host_ok,
-        history.hyperion_health_host_ok,
-        "Hyperion host",
-        "provided in /v2/health",
-        "not provided in /v2/health"
-      )
-    );
 
     // Test 2.1.3 Query Time
     let queryTimeIncorrectMessage = "";
@@ -305,16 +243,7 @@ export async function validateAll(
       queryTimeIncorrectMessage = "not provided";
       history.hyperion_health_query_time_ok = false;
     }
-
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_query_time_ok,
-        history.hyperion_health_query_time_ok,
-        "Hyperion query time",
-        "ok",
-        queryTimeIncorrectMessage
-      )
-    );
+    history.hyperion_health_query_time_message = queryTimeIncorrectMessage;
 
     /**
      * Test 2.1.4 Features
@@ -324,7 +253,7 @@ export async function validateAll(
       featureIncorrectMessage = ", features array is missing";
       history.hyperion_health_all_features_ok = false;
     } else {
-      let errorCounter = 0;
+      let errorCounterLocal = 0;
       // tables
       if (!response.getDataItem(["features", "tables"])) {
         featureIncorrectMessage = ", features.tables array missing";
@@ -334,7 +263,7 @@ export async function validateAll(
           history.hyperion_health_features_tables_proposals_on = true;
         } else {
           history.hyperion_health_features_tables_proposals_on = false;
-          errorCounter++;
+          errorCounterLocal++;
           featureIncorrectMessage += ", tables/proposals is disabled";
         }
 
@@ -343,7 +272,7 @@ export async function validateAll(
           history.hyperion_health_features_tables_accounts_on = true;
         } else {
           history.hyperion_health_features_tables_accounts_on = false;
-          errorCounter++;
+          errorCounterLocal++;
           featureIncorrectMessage += ", tables/accounts is disabled";
         }
 
@@ -352,7 +281,7 @@ export async function validateAll(
           history.hyperion_health_features_tables_voters_on = true;
         } else {
           history.hyperion_health_features_tables_voters_on = false;
-          errorCounter++;
+          errorCounterLocal++;
           featureIncorrectMessage += ", tables/voters is disabled";
         }
       }
@@ -362,7 +291,7 @@ export async function validateAll(
         history.hyperion_health_features_index_deltas_on = true;
       } else {
         history.hyperion_health_features_index_deltas_on = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", index_deltas is disabled";
       }
 
@@ -371,7 +300,7 @@ export async function validateAll(
         history.hyperion_health_features_index_transfer_memo_on = true;
       } else {
         history.hyperion_health_features_index_transfer_memo_on = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", index_transfer_memo is disabled";
       }
 
@@ -380,7 +309,7 @@ export async function validateAll(
         history.hyperion_health_features_index_all_deltas_on = true;
       } else {
         history.hyperion_health_features_index_all_deltas_on = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", index_all_deltas is disabled";
       }
 
@@ -392,7 +321,7 @@ export async function validateAll(
         history.hyperion_health_features_index_deferred_trx_off = true;
       } else {
         history.hyperion_health_features_index_deferred_trx_off = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", deferred_trx is enabled";
       }
 
@@ -404,7 +333,7 @@ export async function validateAll(
         history.hyperion_health_features_index_failed_trx_off = true;
       } else {
         history.hyperion_health_features_index_failed_trx_off = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", failed_trx is enabled";
       }
 
@@ -416,7 +345,7 @@ export async function validateAll(
         history.hyperion_health_features_resource_limits_off = true;
       } else {
         history.hyperion_health_features_resource_limits_off = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", resource_limits is enabled";
       }
 
@@ -428,21 +357,14 @@ export async function validateAll(
         history.hyperion_health_features_resource_usage_off = true;
       } else {
         history.hyperion_health_features_resource_usage_off = false;
-        errorCounter++;
+        errorCounterLocal++;
         featureIncorrectMessage += ", resource_usage is enabled";
       }
 
-      history.hyperion_health_all_features_ok = errorCounter == 0;
+      history.hyperion_health_all_features_ok = errorCounterLocal == 0;
     }
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_all_features_ok,
-        history.hyperion_health_all_features_ok,
-        "Hyperion features",
-        "ok",
-        "not ok" + featureIncorrectMessage
-      )
-    );
+
+    history.hyperion_health_all_features_message = featureIncorrectMessage;
 
     /**
      * Test 2.1.5 Health of Services
@@ -482,27 +404,10 @@ export async function validateAll(
       history.hyperion_health_nodeosrpc_ok = false;
     }
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_nodeosrpc_ok,
-        history.hyperion_health_nodeosrpc_ok,
-        "Hyperion NodesRpc status",
-        "ok",
-        nodeosRpcIncorrectMessage
-      )
-    );
+    history.hyperion_health_nodeosrpc_message = nodeosRpcIncorrectMessage;
 
     // RabbitMq
     history.hyperion_health_rabbitmq_ok = rabbitmq !== undefined && rabbitmq.status === "OK";
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_rabbitmq_ok,
-        history.hyperion_health_rabbitmq_ok,
-        "Hyperion RabbitMq status",
-        "ok",
-        "not ok"
-      )
-    );
 
     // Elastic
     history.hyperion_health_elastic_ok =
@@ -510,16 +415,6 @@ export async function validateAll(
       elastic.status === "OK" &&
       elastic.service_data !== undefined &&
       elastic.service_data.active_shards === "100.0%";
-
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_elastic_ok,
-        history.hyperion_health_elastic_ok,
-        "Hyperion Elastic status",
-        "ok",
-        "not ok"
-      )
-    );
 
     // Elastic - Total indexed blocks
     let indexBlocksIncorrectMessage = "";
@@ -539,15 +434,7 @@ export async function validateAll(
       history.hyperion_health_total_indexed_blocks_ok = false;
     }
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.hyperion_health_total_indexed_blocks_ok,
-        history.hyperion_health_total_indexed_blocks_ok,
-        "Hyperion",
-        "total indexed block == last indexed block",
-        indexBlocksIncorrectMessage
-      )
-    );
+    history.hyperion_health_total_indexed_blocks_message = indexBlocksIncorrectMessage;
   });
 
   /**
@@ -562,16 +449,7 @@ export async function validateAll(
     .then((response) => {
       history.hyperion_transaction_ok = response.ok;
       history.hyperion_transaction_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_transaction_ok,
-          history.hyperion_transaction_ok,
-          "Hyperion get_transaction test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      history.hyperion_transaction_message = response.getFormattedErrorMessage();
 
       if (!history.hyperion_transaction_ok) failedRequestCounter++;
     });
@@ -621,17 +499,7 @@ export async function validateAll(
           hyperionActionsIncorrectMessage += ", action is older than 5min";
         }
       }
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_actions_ok,
-          history.hyperion_actions_ok,
-          "Hyperion get_actions test",
-          "passed",
-          "not passed" + hyperionActionsIncorrectMessage
-        )
-      );
-
+      history.hyperion_actions_message = hyperionActionsIncorrectMessage;
       if (!history.hyperion_actions_ok) failedRequestCounter++;
     });
 
@@ -651,16 +519,7 @@ export async function validateAll(
       history.hyperion_key_accounts_ms = response.elapsedTimeInMilliseconds;
       history.hyperion_key_accounts_ok =
         response.ok && response.isJson() && response.getDataItem(["account_names"]) !== undefined;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.hyperion_key_accounts_ok,
-          history.hyperion_key_accounts_ok,
-          "Hyperion get_key_accounts test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      history.hyperion_key_accounts_message = response.getFormattedErrorMessage();
 
       if (!history.hyperion_key_accounts_ok) failedRequestCounter++;
     });
@@ -673,16 +532,6 @@ export async function validateAll(
   } else {
     history.history_all_checks_ok = false;
   }
-
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.history_all_checks_ok,
-      history.history_all_checks_ok,
-      "History /v1/history is",
-      "healthy",
-      "not healthy"
-    )
-  );
 
   /**
    * Hyperion Health
@@ -712,16 +561,6 @@ export async function validateAll(
     history.hyperion_all_checks_ok = false;
   }
 
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.hyperion_all_checks_ok,
-      history.hyperion_all_checks_ok,
-      "Hyperion /v2/history is",
-      "healthy",
-      "not healthy"
-    )
-  );
-
   /**
    * Total Health
    */
@@ -743,10 +582,5 @@ export async function validateAll(
     childLogger.fatal("Error while saving new History validation to database", error);
   }
 
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageHistory(guild.name, isMainnet, apiEndpoint, validationMessages);
-
-  return [history, convertArrayToJson(validationMessages, apiEndpoint)];
+  return history;
 }
