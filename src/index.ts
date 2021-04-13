@@ -281,7 +281,6 @@ function checkConfig(): boolean {
     ["testnet.api_currency_symbol", "string"],
     ["testnet.api_test_account", "string"],
 
-
     ["validation.validation_round_interval", "number"],
     ["validation.validation_organization_offset", "number"],
     ["validation.validation_api_offset", "number"],

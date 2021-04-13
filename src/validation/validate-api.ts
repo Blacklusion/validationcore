@@ -63,6 +63,12 @@ export async function validateAll(
   // Create dummy api object if lastValidation is undefined
   if (!lastValidation) lastValidation = new Api();
 
+  // Check if Validationround is supposed to be skipped
+  const validationOffset =
+    (config.get("validation.validation_api_offset") - 0.5) * config.get("validation.validation_round_interval");
+
+  if (lastValidation.validation_date.valueOf() >= Date.now() - validationOffset) return lastValidation;
+
   /**
    * SSL Check
    */
@@ -82,8 +88,7 @@ export async function validateAll(
         }
       });
     }
-    validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
-
+    api.ssl_message = sslMessage;
     if (!api.ssl_ok) failedRequestCounter++;
   }
 
@@ -95,16 +100,7 @@ export async function validateAll(
     .then((response) => {
       api.get_info_ok = response.ok && response.isJson();
       api.get_info_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.get_info_ok,
-          api.get_info_ok,
-          "Get_info request",
-          "successful",
-          "not successful" + response.getFormattedErrorMessage()
-        )
-      );
+      api.get_info_message = response.getFormattedErrorMessage();
 
       if (!api.get_info_ok) {
         failedRequestCounter++;
@@ -123,31 +119,11 @@ export async function validateAll(
       api.server_version_ok = serverVersions.includes(serverVersion);
       api.server_version = response.getDataItem(["server_version_string"]);
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.server_version_ok,
-          api.server_version_ok,
-          "Server version " + serverVersion + " is",
-          "valid",
-          "invalid"
-        )
-      );
-
       /**
        * Test 1.2: Api for correct chain
        */
       api.correct_chain =
         typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.correct_chain,
-          api.correct_chain,
-          "Api is provided for the",
-          "correct chain",
-          "wrong chain"
-        )
-      );
 
       /**
        * Test 1.3: Head Block up to date
@@ -183,15 +159,7 @@ export async function validateAll(
         api.head_block_delta_ok = false;
         headBlockIncorrectMessage = ": could not be read from api";
       }
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.head_block_delta_ok,
-          api.head_block_delta_ok,
-          "Head block",
-          "is up-to-date",
-          "is not up-to-date" + headBlockIncorrectMessage
-        )
-      );
+      api.head_block_delta_message = headBlockIncorrectMessage;
     });
 
   /**
@@ -207,16 +175,7 @@ export async function validateAll(
     .then((response) => {
       api.block_one_ok = response.ok && response.isJson();
       api.block_one_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.block_one_ok,
-          api.block_one_ok,
-          "Block one test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      api.block_one_message = response.getFormattedErrorMessage();
 
       if (!api.block_one_ok) failedRequestCounter++;
     });
@@ -229,15 +188,7 @@ export async function validateAll(
     // todo: ensure no check on undefined
     api.verbose_error_ok =
       !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.verbose_error_ok,
-        api.verbose_error_ok,
-        "Verbose Error test",
-        "passed",
-        "not passed" + response.getFormattedErrorMessage()
-      )
-    );
+    api.verbose_error_message = response.getFormattedErrorMessage();
 
     if (!api.verbose_error_ok) failedRequestCounter++;
   });
@@ -270,16 +221,7 @@ export async function validateAll(
                 ? "mainnet.api_test_big_block_transaction_count"
                 : "testnet.api_test_big_block_transaction_count"
             );
-
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.abi_serializer_ok,
-            api.abi_serializer_ok,
-            "Abi serializer test",
-            "passed",
-            "not passed" + response.getFormattedErrorMessage()
-          )
-        );
+        api.abi_serializer_message = response.getFormattedErrorMessage();
 
         if (!api.abi_serializer_ok) failedRequestCounter++;
       });
@@ -303,16 +245,7 @@ export async function validateAll(
     .then((response) => {
       api.basic_symbol_ok = response.ok && Array.isArray(response.dataJson) && response.dataJson.length == 1;
       api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.basic_symbol_ok,
-          api.basic_symbol_ok,
-          "Basic symbol test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      api.basic_symbol_message = response.getFormattedErrorMessage();
 
       if (!api.basic_symbol_ok) failedRequestCounter++;
     });
@@ -333,15 +266,7 @@ export async function validateAll(
       producerApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.producer_api_off,
-        api.producer_api_off,
-        "Producer api",
-        "is disabled",
-        producerApiIncorrectMessage
-      )
-    );
+    api.producer_api_message = producerApiIncorrectMessage;
 
     if (!api.producer_api_off) failedRequestCounter++;
   });
@@ -362,15 +287,7 @@ export async function validateAll(
       dbSizeIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.db_size_api_off,
-        api.db_size_api_off,
-        "Db_size api",
-        "is disabled",
-        dbSizeIncorrectMessage
-      )
-    );
+    api.db_size_api_message = dbSizeIncorrectMessage;
 
     if (!api.db_size_api_off) failedRequestCounter++;
   });
@@ -391,9 +308,7 @@ export async function validateAll(
       netApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
     }
 
-    validationMessages.push(
-      evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
-    );
+    api.net_api_message = netApiIncorrectMessage;
 
     if (!api.net_api_off) failedRequestCounter++;
   });
@@ -414,16 +329,7 @@ export async function validateAll(
     .then((response) => {
       api.wallet_accounts_ok = response.ok && response.isJson();
       api.wallet_accounts_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.wallet_accounts_ok,
-          api.wallet_accounts_ok,
-          "Wallet get_accounts_by_authorizers by accounts test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      api.wallet_accounts_message = response.getFormattedErrorMessage();
 
       if (!api.wallet_accounts_ok) failedRequestCounter++;
     });
@@ -444,16 +350,7 @@ export async function validateAll(
     .then((response) => {
       api.wallet_keys_ok = response.ok && response.isJson();
       api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.wallet_keys_ok,
-          api.wallet_keys_ok,
-          "Wallet get_accounts_by_authorizers by keys test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
+      api.wallet_keys_message = response.getFormattedErrorMessage();
 
       if (!api.wallet_keys_ok) failedRequestCounter++;
     });
@@ -536,29 +433,7 @@ export async function validateAll(
     });
   }
 
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.bp_json_all_features_ok,
-      api.bp_json_all_features_ok,
-      "Supplied features in bp.json are",
-      "ok",
-      featuresIncorrectMessage
-    )
-  );
-
-  validationMessages.push(
-    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain Api", "healthy", "not healthy")
-  );
-
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.wallet_all_checks_ok,
-      api.wallet_all_checks_ok,
-      "Account Query Api is",
-      "healthy",
-      "not healthy"
-    )
-  );
+  api.bp_json_all_features_message = featuresIncorrectMessage;
 
   /**
    * Store results in Database

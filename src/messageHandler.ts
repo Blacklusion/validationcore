@@ -115,3 +115,155 @@ export enum messageState {
   fromFalseToTrue,
   fromFalseToFalse,
 }
+
+function createApiMessages() {
+  validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.get_info_ok,
+      api.get_info_ok,
+      "Get_info request",
+      "successful",
+      "not successful" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.server_version_ok,
+      api.server_version_ok,
+      "Server version " + serverVersion + " is",
+      "valid",
+      "invalid"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.correct_chain,
+      api.correct_chain,
+      "Api is provided for the",
+      "correct chain",
+      "wrong chain"
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.head_block_delta_ok,
+      api.head_block_delta_ok,
+      "Head block",
+      "is up-to-date",
+      "is not up-to-date" + headBlockIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.block_one_ok,
+      api.block_one_ok,
+      "Block one test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.verbose_error_ok,
+      api.verbose_error_ok,
+      "Verbose Error test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.abi_serializer_ok,
+      api.abi_serializer_ok,
+      "Abi serializer test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.basic_symbol_ok,
+      api.basic_symbol_ok,
+      "Basic symbol test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.producer_api_off,
+      api.producer_api_off,
+      "Producer api",
+      "is disabled",
+      producerApiIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.db_size_api_off,
+      api.db_size_api_off,
+      "Db_size api",
+      "is disabled",
+      dbSizeIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.wallet_accounts_ok,
+      api.wallet_accounts_ok,
+      "Wallet get_accounts_by_authorizers by accounts test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.wallet_keys_ok,
+      api.wallet_keys_ok,
+      "Wallet get_accounts_by_authorizers by keys test",
+      "passed",
+      "not passed" + response.getFormattedErrorMessage()
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bp_json_all_features_ok,
+      api.bp_json_all_features_ok,
+      "Supplied features in bp.json are",
+      "ok",
+      featuresIncorrectMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain Api", "healthy", "not healthy")
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.wallet_all_checks_ok,
+      api.wallet_all_checks_ok,
+      "Account Query Api is",
+      "healthy",
+      "not healthy"
+    )
+  );
+}
