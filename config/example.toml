@@ -67,14 +67,8 @@
     ## Specifies how often certain aspects of a guild will be validated
     # Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
     validation_round_interval = 600000
-    # Determines how often API Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
-    validation_api_offset = 1
     # Determines how often Seed Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
     validation_seed_offset = 3
-    # Determines how often History/Hyperion Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
-    validation_history_offset = 1
-    # Determines how often Atomic Assets API should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
-    validation_atomic_offset = 1
 
     ## Settings for the http requests
     # If a request fails, it will be retried x times (this value may be overwritten by requests are suppose to fail)

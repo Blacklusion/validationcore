@@ -282,10 +282,7 @@ function checkConfig(): boolean {
     ["testnet.api_test_account", "string"],
 
     ["validation.validation_round_interval", "number"],
-    ["validation.validation_api_offset", "number"],
     ["validation.validation_seed_offset", "number"],
-    ["validation.validation_history_offset", "number"],
-    ["validation.validation_atomic_offset", "number"],
     ["validation.request_retry_count", "number"],
     ["validation.request_retry_pause_ms", "number"],
     ["validation.request_timeout_ms", "number"],
