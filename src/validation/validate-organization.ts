@@ -442,7 +442,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               /**
                * Test 3.12: Test P2P Nodes
                */
-
               // Get last validation from database with same endpoint url
               let lastSeedValidation: Seed;
               if (lastValidation && lastValidation.nodes_seed) {
@@ -452,17 +451,20 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Seed Endpoint
+              let seedNode: Seed;
+              if (lastSeedValidation.validation_date.valueOf() <= Date.now() - ((config.get("validation.validation_seed_offset") - 0.5) * config.get("validation.validation_round_interval"))) {
+                seedNode = await seed.validateAll(
+                  guild,
+                  isMainnet,
+                  node.p2p_endpoint,
+                  locationOk
+                );
+              } else {
+                seedNode = lastSeedValidation;
+              }
 
-              const seedNode: Seed = await seed.validateAll(
-                guild,
-                isMainnet,
-                node.p2p_endpoint,
-                locationOk
-              );
-
-              // Add seed validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
+              // Add seed validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
               if (seedNode) {
-                // Add relation to seed node to organization database object
                 organization.nodes_seed.push(seedNode);
               }
             }
@@ -473,9 +475,9 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               // Get last validation from database with same endpoint url
               // Stores the last validation for http endpoint
               let lastApiValidation: Api;
-
               // Stores the last validation for httpS endpoint
               let lastSslValidation: Api;
+
               if (lastValidation && lastValidation.nodes_api) {
                 lastApiValidation = lastValidation.nodes_api.find((api) => {
                   return api.api_endpoint === node.api_endpoint;
@@ -494,9 +496,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 locationOk,
                 node.features
               );
-              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
+              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
               if (apiNode) {
-                // Add relation to api node to organization database object
                 organization.nodes_api.push(apiNode);
               }
 
@@ -509,10 +510,8 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 locationOk,
                 node.features
               );
-
-              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
+              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
               if (sslNode) {
-                // Add relation to ssl api node to organization database object
                 organization.nodes_api.push(sslNode);
               }
             }
