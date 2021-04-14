@@ -67,8 +67,6 @@
     ## Specifies how often certain aspects of a guild will be validated
     # Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
     validation_round_interval = 600000
-    # Determines how often certain Organization aspects should be validated (e.g. logos). Some Aspects (e.g. bpjsons) will be validated every round (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
-    validation_organization_offset = 3
     # Determines how often API Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
     validation_api_offset = 1
     # Determines how often Seed Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
