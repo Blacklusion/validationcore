@@ -477,3 +477,209 @@ function createSeedMessage() {
     evaluateMessage(lastValidation.all_checks_ok, seed.all_checks_ok, "Seed Node is", "healthy", "not healthy")
   );
 }
+
+function createOrganizationMessages() {
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.reg_location_ok,
+      organization.reg_location_ok,
+      "Location (" + location + ") on Chain is",
+      "valid",
+      "invalid"
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.reg_website_ok,
+      organization.reg_website_ok,
+      "Website registered on Chain is",
+      "reachable",
+      "not reachable or was not provided" + response.getFormattedErrorMessage()
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.chains_json_ok,
+      organization.chains_json_ok,
+      "Chains.json",
+      "found and with valid json formatting",
+      chainsJsonMessage
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.chains_json_access_control_header_ok,
+      organization.chains_json_access_control_header_ok,
+      "Chains.json Access-control-allow-origin header",
+      "configured properly",
+      "not configured properly"
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_producer_account_name_ok,
+      organization.bpjson_producer_account_name_ok,
+      "Producer account name in " + pathToBpJson,
+      "is valid",
+      producerNameMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_candidate_name_ok,
+      organization.bpjson_candidate_name_ok,
+      "Candidate name in " + pathToBpJson + " is",
+      "valid",
+      "not valid"
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_candidate_name_ok,
+      organization.bpjson_candidate_name_ok,
+      "Website in " + pathToBpJson,
+      "is reachable",
+      "is not reachable" + response.getFormattedErrorMessage()
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  // WAS changed to lastValidation.bpjson_website_ok from lastValidation.bpjson_candidate_name_ok
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_website_ok,
+      organization.bpjson_website_ok
+      "Website in " + pathToBpJson,
+      "is reachable",
+      "is not reachable" + response.getFormattedErrorMessage()
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_code_of_conduct_ok,
+      organization.bpjson_code_of_conduct_ok,
+      "Code of conduct in " + pathToBpJson,
+      "is reachable.",
+      "is not reachable" + response.getFormattedErrorMessage()
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_ownership_disclosure_ok,
+      organization.bpjson_ownership_disclosure_ok,
+      "Ownership Disclosure in " + pathToBpJson,
+      "is reachable",
+      "is not reachable" + response.getFormattedErrorMessage()
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_email_ok,
+      organization.bpjson_email_ok,
+      "Email in " + pathToBpJson,
+      "is valid",
+      emailIncorrectMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_github_user_ok,
+      organization.bpjson_github_user_ok,
+      "GitHub user in " + pathToBpJson,
+      "was provided (min. 1)",
+      gitHubUserIncorrectMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_chain_resources_ok,
+      organization.bpjson_chain_resources_ok,
+      "Chain resources in " + pathToBpJson,
+      "is valid",
+      chainResourcesIncorrectMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_other_resources_ok,
+      organization.bpjson_other_resources_ok,
+      "Other resources in " + pathToBpJson,
+      "are valid",
+      otherResourcesIncorrectMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_branding_ok,
+      organization.bpjson_branding_ok,
+      "Branding in " + pathToBpJson,
+      "provided in all three formats",
+      brandingIncorrectMessage
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_location_ok,
+      organization.bpjson_location_ok,
+      "Location of your organization in " + pathToBpJson,
+      "is valid.",
+      "is invalid."
+    )
+  );
+
+  // Create Explanation for Pager Messages and locally stored .json
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.bpjson_social_ok,
+      organization.bpjson_social_ok,
+      "Social Services in " + pathToBpJson,
+      "are valid",
+      "are either not provided (min. 4 required) or some are invalid (no urls or @ before username allowed)."
+    )
+  );
+
+  // Create Explanation for Producer node
+  // Note: Apis' and Seeds' Explanations are created in the validateAll methods
+  // todo: add promises to ensure loop is finished before creating message
+  validationMessages.push(
+    evaluateMessage(
+      lastValidation.nodes_producer_found,
+      organization.nodes_producer_found,
+      "",
+      "At least one producer node with valid location in " + pathToBpJson,
+      "No producer node with valid location in " + pathToBpJson
+    )
+  );
+
+  validationMessages.push(
+    evaluateMessage(lastValidation.bpjson_found, organization.bpjson_found, "bp.json", "found", bpJsonIncorrectMessage)
+  );
+}

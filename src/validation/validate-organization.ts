@@ -32,19 +32,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
   const chainId: string = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
   let pathToBpJson: string;
 
-  // Stores all validation explanations for organization
-  const validationMessages: Array<[string, number]> = [];
-
-  // After each validation a json with all validation messages is stored to disk
-  const guildJson = {};
-  guildJson["guild"] = guild.name;
-  guildJson["validation_date"] = new Date();
-  guildJson["isMainnet"] = isMainnet;
-
-  const seedJsons: Array<any> = [];
-  const apiJsons: Array<any> = [];
-  const historyJsons: Array<any> = [];
-
   // Create organization object for database
   const database = getConnection();
   const organization: Organization = new Organization();
@@ -75,39 +62,16 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
    * Test 1.1: Regged Location
    */
   const location: number = isMainnet ? guild.mainnet_location : guild.testnet_location;
-
-  // Set status in database
   organization.reg_location_ok = location < 900 && location > 0;
-
-  // Create Explanation for Pager Messages and locally stored .json
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.reg_location_ok,
-      organization.reg_location_ok,
-      "Location (" + location + ") on Chain is",
-      "valid",
-      "invalid"
-    )
-  );
+  organization.reg_location = location;
 
   /**
    * Test 1.2: Regged Website
    */
   await http.get(url).then((response) => {
-    // Set status in database
     organization.reg_website_ok = response.ok;
     organization.reg_website_ms = response.elapsedTimeInMilliseconds;
-
-    // Create Explanation for Pager Messages and locally stored .json
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.reg_website_ok,
-        organization.reg_website_ok,
-        "Website registered on Chain is",
-        "reachable",
-        "not reachable or was not provided" + response.getFormattedErrorMessage()
-      )
-    );
+    organization.reg_website_message = response.getFormattedErrorMessage();
   });
 
   /**
@@ -126,17 +90,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
     if (response.ok && !response.isJson()) {
       chainsJsonMessage = "is not a valid json";
     }
-
-    // Create Explanation for Pager Messages and locally stored .json
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.chains_json_ok,
-        organization.chains_json_ok,
-        "Chains.json",
-        "found and with valid json formatting",
-        chainsJsonMessage
-      )
-    );
+    organization.chains_json_message = chainsJsonMessage;
 
     /**
      * Test 2.2: Is access control allow origin header configured
@@ -147,17 +101,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       response.headers !== undefined &&
       response.headers.has("access-control-allow-origin") &&
       response.headers.get("access-control-allow-origin") === "*";
-
-    // Create Explanation for Pager Messages and locally stored .json
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.chains_json_access_control_header_ok,
-        organization.chains_json_access_control_header_ok,
-        "Chains.json Access-control-allow-origin header",
-        "configured properly",
-        "not configured properly"
-      )
-    );
 
     /**
      * Get path to bp.json
@@ -218,17 +161,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       } else {
         organization.bpjson_producer_account_name_ok = false;
       }
-
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_producer_account_name_ok,
-          organization.bpjson_producer_account_name_ok,
-          "Producer account name in " + pathToBpJson,
-          "is valid",
-          producerNameMessage
-        )
-      );
+      organization.bpjson_producer_account_name_message = producerNameMessage
 
       /**
        * Test 3.2: candidate name
@@ -238,34 +171,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         response.getDataItem(["org", "candidate_name"]) !== undefined &&
         new RegExp(".+").test(response.getDataItem(["org", "candidate_name"]));
 
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_candidate_name_ok,
-          organization.bpjson_candidate_name_ok,
-          "Candidate name in " + pathToBpJson + " is",
-          "valid",
-          "not valid"
-        )
-      );
-
       /**
        * Test 3.3: website
        */
       await http.get(response.getDataItem(["org", "website"])).then((response) => {
         organization.bpjson_website_ok = response.ok;
         organization.bpjson_website_ms = response.elapsedTimeInMilliseconds;
-
-        // Create Explanation for Pager Messages and locally stored .json
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.bpjson_candidate_name_ok,
-            organization.bpjson_candidate_name_ok,
-            "Website in " + pathToBpJson,
-            "is reachable",
-            "is not reachable" + response.getFormattedErrorMessage()
-          )
-        );
+        organization.bpjson_website_message = response.getFormattedErrorMessage();
       });
 
       /**
@@ -274,17 +186,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       await http.get(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
         organization.bpjson_code_of_conduct_ok = response.ok;
         organization.bpjson_code_of_conduct_ms = response.elapsedTimeInMilliseconds;
-
-        // Create Explanation for Pager Messages and locally stored .json
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.bpjson_code_of_conduct_ok,
-            organization.bpjson_code_of_conduct_ok,
-            "Code of conduct in " + pathToBpJson,
-            "is reachable.",
-            "is not reachable" + response.getFormattedErrorMessage()
-          )
-        );
+        organization.bpjson_code_of_conduct_message = response.getFormattedErrorMessage();
       });
 
       /**
@@ -293,17 +195,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       await http.get(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
         organization.bpjson_ownership_disclosure_ok = response.ok;
         organization.bpjson_ownership_disclosure_ms = response.elapsedTimeInMilliseconds;
-
-        // Create Explanation for Pager Messages and locally stored .json
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.bpjson_ownership_disclosure_ok,
-            organization.bpjson_ownership_disclosure_ok,
-            "Ownership Disclosure in " + pathToBpJson,
-            "is reachable",
-            "is not reachable" + response.getFormattedErrorMessage()
-          )
-        );
+        organization.bpjson_ownership_disclosure_message = response.getFormattedErrorMessage();
       });
 
       /**
@@ -323,17 +215,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         organization.bpjson_email_ok = false;
         emailIncorrectMessage = "was not provided";
       }
-
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_email_ok,
-          organization.bpjson_email_ok,
-          "Email in " + pathToBpJson,
-          "is valid",
-          emailIncorrectMessage
-        )
-      );
+      organization.bpjson_email_message = emailIncorrectMessage;
 
       /**
        * Test : GitHub User
@@ -367,7 +249,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               organization.bpjson_github_user_ok = false;
             }
           }
-
           gitHubUserIncorrectMessage += ")";
 
           // One GitHub user supplied
@@ -383,17 +264,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         gitHubUserIncorrectMessage = "was not provided";
         organization.bpjson_github_user_ok = false;
       }
-
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_github_user_ok,
-          organization.bpjson_github_user_ok,
-          "GitHub user in " + pathToBpJson,
-          "was provided (min. 1)",
-          gitHubUserIncorrectMessage
-        )
-      );
+      organization.bpjson_github_user_message = gitHubUserIncorrectMessage;
 
       /**
        * Test 3. : Chain resources
@@ -414,17 +285,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         organization.bpjson_chain_resources_ok = false;
         chainResourcesIncorrectMessage = "was not provided";
       }
-
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_chain_resources_ok,
-          organization.bpjson_chain_resources_ok,
-          "Chain resources in " + pathToBpJson,
-          "is valid",
-          chainResourcesIncorrectMessage
-        )
-      );
+      organization.bpjson_chain_resources_message = chainResourcesIncorrectMessage;
 
       /**
        * Test 3. : Other resources
@@ -453,16 +314,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         otherResourcesIncorrectMessage = "were not provided";
         organization.bpjson_other_resources_ok = false;
       }
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_other_resources_ok,
-          organization.bpjson_other_resources_ok,
-          "Other resources in " + pathToBpJson,
-          "are valid",
-          otherResourcesIncorrectMessage
-        )
-      );
+      organization.bpjson_other_resources_message = otherResourcesIncorrectMessage;
 
       /**
        * Test 3.7: branding
@@ -529,16 +381,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         brandingIncorrectMessage = "not provided in all three formats";
       }
 
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_branding_ok,
-          organization.bpjson_branding_ok,
-          "Branding in " + pathToBpJson,
-          "provided in all three formats",
-          brandingIncorrectMessage
-        )
-      );
+      organization.bpjson_branding_message = brandingIncorrectMessage;
 
       /**
        * Test 3.8: location
@@ -547,16 +390,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
         response.getDataItem(["org", "location"]) !== undefined &&
         validateBpLocation(response.getDataItem(["org", "location"]));
 
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_location_ok,
-          organization.bpjson_location_ok,
-          "Location of your organization in " + pathToBpJson,
-          "is valid.",
-          "is invalid."
-        )
-      );
       /**
        * Test 3.9: social
        */
@@ -582,17 +415,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       } else {
         organization.bpjson_social_ok = false;
       }
-
-      // Create Explanation for Pager Messages and locally stored .json
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.bpjson_social_ok,
-          organization.bpjson_social_ok,
-          "Social Services in " + pathToBpJson,
-          "are valid",
-          "are either not provided (min. 4 required) or some are invalid (no urls or @ before username allowed)."
-        )
-      );
 
       /**
        * ====================================================================================
@@ -631,21 +453,17 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
               // Validate Seed Endpoint
 
-              const seedNode: [Seed, string] = await seed.validateAll(
+              const seedNode: Seed = await seed.validateAll(
                 guild,
-                lastSeedValidation,
                 isMainnet,
                 node.p2p_endpoint,
                 locationOk
               );
 
               // Add seed validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(seedNode) && seedNode[0] && seedNode[1]) {
+              if (seedNode) {
                 // Add relation to seed node to organization database object
-                organization.nodes_seed.push(seedNode[0]);
-
-                // Add seed validation messages to seed json array
-                seedJsons.push(seedNode[1]);
+                organization.nodes_seed.push(seedNode);
               }
             }
             if (node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) {
@@ -668,32 +486,24 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Http endpoint
-              const apiNode: [Api, string, string] = await api.validateAll(
+              const apiNode: Api = await api.validateAll(
                 guild,
                 isMainnet,
-                lastApiValidation,
                 node.api_endpoint,
                 false,
                 locationOk,
                 node.features
               );
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(apiNode) && apiNode[0] && apiNode[1]) {
+              if (apiNode) {
                 // Add relation to api node to organization database object
-                organization.nodes_api.push(apiNode[0]);
-
-                // Add api validation messages to api json array
-                apiJsons.push(apiNode[1]);
-
-                // Add History validation message to history json array
-                if (apiNode[2]) historyJsons.push(apiNode[2]);
+                organization.nodes_api.push(apiNode);
               }
 
               // Validate Https endpoint
-              const sslNode: [Api, string, string] = await api.validateAll(
+              const sslNode: Api = await api.validateAll(
                 guild,
                 isMainnet,
-                lastSslValidation,
                 node.ssl_endpoint,
                 true,
                 locationOk,
@@ -701,33 +511,14 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               );
 
               // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(sslNode) && sslNode[0] && sslNode[1]) {
+              if (sslNode) {
                 // Add relation to ssl api node to organization database object
-                organization.nodes_api.push(sslNode[0]);
-
-                // Add ssl api validation messages to api json array
-                apiJsons.push(sslNode[1]);
-
-                // Add History validation message to history json array
-                if (sslNode[2]) historyJsons.push(sslNode[2]);
+                organization.nodes_api.push(sslNode);
               }
             }
           }
         }
       }
-
-      // Create Explanation for Producer node
-      // Note: Apis' and Seeds' Explanations are created in the validateAll methods
-      // todo: add promises to ensure loop is finished before creating message
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.nodes_producer_found,
-          organization.nodes_producer_found,
-          "",
-          "At least one producer node with valid location in " + pathToBpJson,
-          "No producer node with valid location in " + pathToBpJson
-        )
-      );
     });
   } else {
     bpJsonIncorrectMessage = "not provided";
@@ -736,9 +527,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   // General status of bp.json
   // Create Explanation for Pager Messages and locally stored .json
-  validationMessages.push(
-    evaluateMessage(lastValidation.bpjson_found, organization.bpjson_found, "bp.json", "found", bpJsonIncorrectMessage)
-  );
+  organization.bpjson_found_message = bpJsonIncorrectMessage;
 
   /**
    * SAVE results to database
@@ -764,20 +553,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
       testnet_last_validation_id: organization.id,
     });
   }
-
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageOrganization(guild.name, isMainnet, validationMessages);
-
-  /**
-   * Concat all json to single json and write file to disk
-   */
-  guildJson["organization"] = convertArrayToJson(validationMessages);
-  guildJson["api_nodes"] = apiJsons;
-  guildJson["history_nodes"] = historyJsons;
-  guildJson["seed_nodes"] = seedJsons;
-  await writeJsonToDisk(guild.name, isMainnet, JSON.stringify(guildJson));
 
   // It must be returned a dummy promise, so the parent function calling this function waits until all validations are completed
   return Promise.resolve(true);

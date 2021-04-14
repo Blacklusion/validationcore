@@ -8,7 +8,6 @@ import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/HttpRequest";
-import { evaluateMessage, convertArrayToJson } from "../messageHandler";
 
 /**
  * Logger Settings for Api
@@ -23,7 +22,6 @@ const childLogger: Logger = logger.getChildLogger({
  * Performs all validations for an Api-Node
  * @param {Guild} guild = guild for which the Api is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
- * @param {Api} lastValidation = last validation of the SAME Api Endpoint
  * @param {string} apiEndpoint = url of the api node (http and https possible)
  * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
@@ -32,12 +30,11 @@ const childLogger: Logger = logger.getChildLogger({
 export async function validateAll(
   guild: Guild,
   isMainnet: boolean,
-  lastValidation: Api,
   apiEndpoint: string,
   isSsl: boolean,
   locationOk: boolean,
   features: string[]
-): Promise<[Api, any, any]> {
+): Promise<Api> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -50,7 +47,6 @@ export async function validateAll(
 
   // Set general variables
   const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  const validationMessages: Array<[string, number]> = [];
 
   // Create api object for database
   const database = getConnection();
@@ -59,15 +55,6 @@ export async function validateAll(
   api.location_ok = locationOk;
   api.api_endpoint = apiEndpoint;
   api.validation_is_mainnet = isMainnet;
-
-  // Create dummy api object if lastValidation is undefined
-  if (!lastValidation) lastValidation = new Api();
-
-  // Check if Validationround is supposed to be skipped
-  const validationOffset =
-    (config.get("validation.validation_api_offset") - 0.5) * config.get("validation.validation_round_interval");
-
-  if (lastValidation.validation_date.valueOf() >= Date.now() - validationOffset) return lastValidation;
 
   /**
    * SSL Check
@@ -392,13 +379,12 @@ export async function validateAll(
     history = await ValidateHistory.validateAll(
       guild,
       isMainnet,
-      lastValidation.history_validation,
       apiEndpoint,
       isSsl
     );
 
-    if (Array.isArray(history) && history[0]) {
-      api.history_validation = history[0];
+    if (history) {
+      api.history_validation = history;
     }
   }
 
@@ -451,14 +437,5 @@ export async function validateAll(
     childLogger.fatal("Error while saving new Api validation to database", error);
   }
 
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
-
-  return [
-    api,
-    convertArrayToJson(validationMessages, apiEndpoint),
-    Array.isArray(history) && history.length == 2 ? history[1] : undefined,
-  ];
+  return api;
 }
