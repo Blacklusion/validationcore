@@ -468,51 +468,50 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                 organization.nodes_seed.push(seedNode);
               }
             }
-            if (node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) {
-              /**
-               * Test 3.13: Test Api Nodes
-               */
-              // Get last validation from database with same endpoint url
-              // Stores the last validation for http endpoint
-              let lastApiValidation: Api;
-              // Stores the last validation for httpS endpoint
-              let lastSslValidation: Api;
+            if ((node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) && Array.isArray(node.features)) {
+              if (node.node_type.includes("chain-api")) {
+                /**
+                 * Test 3.13: Test Api Nodes
+                 */
+                  // Validate Http endpoint
+                const apiNode: Api = await api.validateAll(
+                  guild,
+                  isMainnet,
+                  node.api_endpoint,
+                  false,
+                  locationOk,
+                  node.features
+                  );
+                // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
+                if (apiNode) {
+                  organization.nodes_api.push(apiNode);
+                }
 
-              if (lastValidation && lastValidation.nodes_api) {
-                lastApiValidation = lastValidation.nodes_api.find((api) => {
-                  return api.api_endpoint === node.api_endpoint;
-                });
-                lastSslValidation = lastValidation.nodes_api.find((api) => {
-                  return api.api_endpoint === node.ssl_endpoint;
-                });
+                // Validate Https endpoint
+                const sslNode: Api = await api.validateAll(
+                  guild,
+                  isMainnet,
+                  node.ssl_endpoint,
+                  true,
+                  locationOk,
+                  node.features
+                );
+                // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
+                if (sslNode) {
+                  organization.nodes_api.push(sslNode);
+                }
               }
 
-              // Validate Http endpoint
-              const apiNode: Api = await api.validateAll(
-                guild,
-                isMainnet,
-                node.api_endpoint,
-                false,
-                locationOk,
-                node.features
-              );
-              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
-              if (apiNode) {
-                organization.nodes_api.push(apiNode);
+              if (node.node_type.includes("history-v1")) {
+
               }
 
-              // Validate Https endpoint
-              const sslNode: Api = await api.validateAll(
-                guild,
-                isMainnet,
-                node.ssl_endpoint,
-                true,
-                locationOk,
-                node.features
-              );
-              // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
-              if (sslNode) {
-                organization.nodes_api.push(sslNode);
+              if (node.node_type.includes("hyperion-v2")) {
+
+              }
+
+              if (node.node_type.includes("atomic-assets-api")) {
+
               }
             }
           }
@@ -597,3 +596,26 @@ function validateBpLocation(location: any): boolean {
 
   return successfulLocationTests == 4;
 }
+
+
+/*
+              OLD CODE
+
+              // Get last validation from database with same endpoint url
+              // Stores the last validation for http endpoint
+              let lastApiValidation: Api;
+              // Stores the last validation for httpS endpoint
+              let lastSslValidation: Api;
+
+              if (lastValidation && lastValidation.nodes_api) {
+                lastApiValidation = lastValidation.nodes_api.find((api) => {
+                  return api.api_endpoint === node.api_endpoint;
+                });
+                lastSslValidation = lastValidation.nodes_api.find((api) => {
+                  return api.api_endpoint === node.ssl_endpoint;
+                });
+              }
+
+
+
+ */
