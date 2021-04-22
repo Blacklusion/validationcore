@@ -1,6 +1,7 @@
 import * as config from "config";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as ValidateHistory from "./validate-history";
+import * as ValidateAtomic from "./validate-atomic";
 import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
 import { Api } from "../database/entity/Api";
@@ -371,10 +372,11 @@ export async function validateAll(
   }
 
   /**
-   * Test History
+   * Test History & Atomic Api
    */
 
   let history;
+  let atomic;
   if (api.all_checks_ok) {
     history = await ValidateHistory.validateAll(
       guild,
@@ -382,9 +384,14 @@ export async function validateAll(
       apiEndpoint,
       isSsl
     );
-
     if (history) {
       api.history_validation = history;
+    }
+
+    atomic = await ValidateAtomic.validateAll(guild, isMainnet, apiEndpoint, isSsl);
+
+    if (atomic) {
+      api.
     }
   }
 
