@@ -616,38 +616,6 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             ) {
               if (!organization.nodes_producer_found) organization.nodes_producer_found = locationOk;
             }
-            if (node.node_type == "seed" || (Array.isArray(node.node_type) && node.node_type.includes("seed"))) {
-              /**
-               * Test 3.12: Test P2P Nodes
-               */
-
-              // Get last validation from database with same endpoint url
-              let lastSeedValidation: Seed;
-              if (lastValidation && lastValidation.nodes_seed) {
-                lastSeedValidation = lastValidation.nodes_seed.find((seed) => {
-                  return seed.p2p_endpoint === node.p2p_endpoint;
-                });
-              }
-
-              // Validate Seed Endpoint
-
-              const seedNode: [Seed, string] = await seed.validateAll(
-                guild,
-                lastSeedValidation,
-                isMainnet,
-                node.p2p_endpoint,
-                locationOk
-              );
-
-              // Add seed validation to organization object, if it is not undefined (e.g. undefined if no url is provided)
-              if (Array.isArray(seedNode) && seedNode[0] && seedNode[1]) {
-                // Add relation to seed node to organization database object
-                organization.nodes_seed.push(seedNode[0]);
-
-                // Add seed validation messages to seed json array
-                seedJsons.push(seedNode[1]);
-              }
-            }
             if (node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) {
               /**
                * Test 3.13: Test Api Nodes
