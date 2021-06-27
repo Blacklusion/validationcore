@@ -2,31 +2,31 @@ import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
 import * as config from "config";
 import { Logger } from "tslog";
-import { History } from "../database/entity/History";
+import { NodeHistory } from "../database/entity/NodeHistory";
 import { getConnection } from "typeorm";
 import { HttpErrorType } from "../httpConnection/HttpErrorType";
 import * as http from "../httpConnection/HttpRequest";
 
 /**
- * Logger Settings for History
+ * Logger Settings for NodeHistory
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "History-Validation",
 });
 
 /**
- * Performs all validations of the History
- * @param {Guild} guild = guild for which the History is validated (must be tracked in database)
+ * Performs all validations of the NodeHistory
+ * @param {Guild} guild = guild for which the NodeHistory is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  * @param {string} apiEndpoint = url of the api node (http and https possible)
- * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
+ * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
  */
 export async function validateAll(
   guild: Guild,
   isMainnet: boolean,
   apiEndpoint: string,
   isSsl: boolean
-): Promise<History> {
+): Promise<NodeHistory> {
   if (!apiEndpoint) return undefined;
 
   // Counts how many requests have failed. If performance mode is enabled, future requests may not be performed, if to many requests already failed
@@ -36,7 +36,7 @@ export async function validateAll(
 
   // Create history object for database
   const database = getConnection();
-  const history: History = new History();
+  const history: NodeHistory = new NodeHistory();
   history.guild = guild.name;
   history.api_endpoint = apiEndpoint;
   history.validation_is_mainnet = isMainnet;
@@ -195,7 +195,7 @@ export async function validateAll(
     });
 
   /**
-   * History Health
+   * NodeHistory Health
    */
   if (history.transaction_ok && history.actions_ok && history.key_accounts_ok) {
     history.all_checks_ok = true;
@@ -210,14 +210,14 @@ export async function validateAll(
   try {
     await database.manager.save(history);
     childLogger.debug(
-      "SAVED \t New History validation to database for " +
+      "SAVED \t New NodeHistory validation to database for " +
         guild.name +
         " " +
         (isMainnet ? "mainnet" : "testnet") +
         " to database"
     );
   } catch (error) {
-    childLogger.fatal("Error while saving new History validation to database", error);
+    childLogger.fatal("Error while saving new NodeHistory validation to database", error);
   }
 
   return history;

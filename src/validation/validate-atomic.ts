@@ -4,15 +4,15 @@ import * as ValidateHistory from "./validate-history";
 import * as ValidateAtomic from "./validate-atomic";
 import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
-import { Api } from "../database/entity/Api";
+import { NodeApi } from "../database/entity/NodeApi";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/HttpRequest";
-import { Atomic } from "../database/entity/Atomic";
+import { NodeAtomic } from "../database/entity/NodeAtomic";
 
 /**
- * Logger Settings for Atomic Api
+ * Logger Settings for NodeAtomic NodeApi
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "AA-Validation",
@@ -21,11 +21,11 @@ const childLogger: Logger = logger.getChildLogger({
 });
 
 /**
- * Performs all validations for an Atomic Api-Node
- * @param {Guild} guild = guild for which the Atomic Api is validated (must be tracked in database)
+ * Performs all validations for an NodeAtomic NodeApi-Node
+ * @param {Guild} guild = guild for which the NodeAtomic NodeApi is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  * @param {string} apiEndpoint = url of the api node (http and https possible)
- * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
+ * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
  */
 export async function validateAll(
@@ -34,7 +34,7 @@ export async function validateAll(
   apiEndpoint: string,
   isSsl: boolean,
   locationOk: boolean,
-): Promise<Atomic> {
+): Promise<NodeAtomic> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -50,7 +50,7 @@ export async function validateAll(
 
   // Create atomic object for database
   const database = getConnection();
-  const atomic: Atomic = new Atomic();
+  const atomic: NodeAtomic = new NodeAtomic();
   atomic.guild = guild.name;
   atomic.location_ok = locationOk;
   atomic.api_endpoint = apiEndpoint;
@@ -93,7 +93,7 @@ export async function validateAll(
 
     // Test 1.1 Health version
     /*
-    In the current implementation there is no check for the version, since the atomic Api is still very young
+    In the current implementation there is no check for the version, since the atomic NodeApi is still very young
     atomic.health_version_ok = response.getDataItem(["version"]) !== undefined;
      */
 
@@ -179,7 +179,7 @@ export async function validateAll(
 
   /**
    * Set all checks ok
-   * (location check is excluded, because a wrong location does not interfere with the function of an Api node
+   * (location check is excluded, because a wrong location does not interfere with the function of an NodeApi node
    */
   // An unpleasant solution, however simplifying this into a single line would cause sideeffects with undefined. This ensures the result will always be a boolean
   if (
@@ -203,14 +203,14 @@ export async function validateAll(
   try {
     await database.manager.save(atomic);
     childLogger.debug(
-      "SAVED \t New Atomic validation to database for " +
+      "SAVED \t New NodeAtomic validation to database for " +
       guild.name +
       " " +
       (isMainnet ? "mainnet" : "testnet") +
       " to database"
     );
   } catch (error) {
-    childLogger.fatal("Error while saving new Atomic validation to database", error);
+    childLogger.fatal("Error while saving new NodeAtomic validation to database", error);
   }
 
   return atomic;

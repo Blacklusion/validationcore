@@ -143,7 +143,7 @@ function createApiMessages() {
     evaluateMessage(
       lastValidation.correct_chain,
       api.correct_chain,
-      "Api is provided for the",
+      "NodeApi is provided for the",
       "correct chain",
       "wrong chain"
     )
@@ -254,14 +254,14 @@ function createApiMessages() {
   );
 
   validationMessages.push(
-    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain Api", "healthy", "not healthy")
+    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain NodeApi", "healthy", "not healthy")
   );
 
   validationMessages.push(
     evaluateMessage(
       lastValidation.wallet_all_checks_ok,
       api.wallet_all_checks_ok,
-      "Account Query Api is",
+      "Account Query NodeApi is",
       "healthy",
       "not healthy"
     )
@@ -275,7 +275,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.history_transaction_ok,
       history.history_transaction_ok,
-      "History get_transaction test",
+      "NodeHistory get_transaction test",
       "passed",
       "not passed" + response.getFormattedErrorMessage()
     )
@@ -285,7 +285,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.history_actions_ok,
       history.history_actions_ok,
-      "History get_actions test",
+      "NodeHistory get_actions test",
       "passed",
       "not passed" + historyActionsIncorrectMessage
     )
@@ -295,7 +295,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.history_key_accounts_ok,
       history.history_key_accounts_ok,
-      "History get_key_accounts test",
+      "NodeHistory get_key_accounts test",
       "passed",
       "not passed" + historyKeyIncorrectMessage
     )
@@ -305,7 +305,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_found,
       history.hyperion_health_found,
-      "Hyperion /v2/health",
+      "NodeHyperion /v2/health",
       "found",
       "not found" + response.getFormattedErrorMessage()
     )
@@ -315,7 +315,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_version_ok,
       history.hyperion_health_version_ok,
-      "Hyperion version",
+      "NodeHyperion version",
       "provided in /v2/health",
       "not provided in /v2/health"
     )
@@ -325,7 +325,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_host_ok,
       history.hyperion_health_host_ok,
-      "Hyperion host",
+      "NodeHyperion host",
       "provided in /v2/health",
       "not provided in /v2/health"
     )
@@ -335,7 +335,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_query_time_ok,
       history.hyperion_health_query_time_ok,
-      "Hyperion query time",
+      "NodeHyperion query time",
       "ok",
       queryTimeIncorrectMessage
     )
@@ -345,7 +345,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_all_features_ok,
       history.hyperion_health_all_features_ok,
-      "Hyperion features",
+      "NodeHyperion features",
       "ok",
       "not ok" + featureIncorrectMessage
     )
@@ -355,7 +355,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_nodeosrpc_ok,
       history.hyperion_health_nodeosrpc_ok,
-      "Hyperion NodesRpc status",
+      "NodeHyperion NodesRpc status",
       "ok",
       nodeosRpcIncorrectMessage
     )
@@ -365,7 +365,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_rabbitmq_ok,
       history.hyperion_health_rabbitmq_ok,
-      "Hyperion RabbitMq status",
+      "NodeHyperion RabbitMq status",
       "ok",
       "not ok"
     )
@@ -375,7 +375,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_health_elastic_ok,
       history.hyperion_health_elastic_ok,
-      "Hyperion Elastic status",
+      "NodeHyperion Elastic status",
       "ok",
       "not ok"
     )
@@ -395,7 +395,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_transaction_ok,
       history.hyperion_transaction_ok,
-      "Hyperion get_transaction test",
+      "NodeHyperion get_transaction test",
       "passed",
       "not passed" + response.getFormattedErrorMessage()
     )
@@ -405,7 +405,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_actions_ok,
       history.hyperion_actions_ok,
-      "Hyperion get_actions test",
+      "NodeHyperion get_actions test",
       "passed",
       "not passed" + hyperionActionsIncorrectMessage
     )
@@ -415,7 +415,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_key_accounts_ok,
       history.hyperion_key_accounts_ok,
-      "Hyperion get_key_accounts test",
+      "NodeHyperion get_key_accounts test",
       "passed",
       "not passed" + response.getFormattedErrorMessage()
     )
@@ -425,7 +425,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.history_all_checks_ok,
       history.history_all_checks_ok,
-      "History /v1/history is",
+      "NodeHistory /v1/history is",
       "healthy",
       "not healthy"
     )
@@ -435,7 +435,7 @@ function createHistoryMessages() {
     evaluateMessage(
       lastValidation.hyperion_all_checks_ok,
       history.hyperion_all_checks_ok,
-      "Hyperion /v2/history is",
+      "NodeHyperion /v2/history is",
       "healthy",
       "not healthy"
     )

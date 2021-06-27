@@ -9,7 +9,7 @@ import * as stream from "stream";
 import fetch = require("node-fetch");
 import { logger } from "../common";
 import { getConnection } from "typeorm";
-import { Seed } from "../database/entity/Seed";
+import { NodeSeed } from "../database/entity/NodeSeed";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { sendMessageSeed } from "../telegramHandler";
@@ -25,7 +25,7 @@ import { convertArrayToJson, evaluateMessage } from "../messageHandler";
  */
 
 /**
- * Logger Settings for Organization
+ * Logger Settings for Validation
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "P2P-Validation",
@@ -293,7 +293,7 @@ export async function validateAll(
   isMainnet: boolean,
   p2pEndpoint: string,
   locationOk: boolean
-): Promise<Seed> {
+): Promise<NodeSeed> {
   if (!p2pEndpoint) return undefined;
 
   // Set general variables
@@ -301,7 +301,7 @@ export async function validateAll(
 
   // Create seed object for database
   const database = getConnection();
-  const seed: Seed = new Seed();
+  const seed: NodeSeed = new NodeSeed();
   seed.guild = guild.name;
   seed.validation_is_mainnet = isMainnet;
   seed.location_ok = locationOk;

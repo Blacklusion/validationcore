@@ -167,19 +167,19 @@ async function validateAllGuilds() {
 }
 
 /**
- * Gets all active producers from an Api and adds new guilds to the database
+ * Gets all active producers from an NodeApi and adds new guilds to the database
  * @param isMainnet = determines if guilds for Testnet or Mainnet are added
  */
 async function updateGuildTable(isMainnet: boolean) {
   const database = getConnection();
 
-  // Prepare Api Access
+  // Prepare NodeApi Access
   const rpc = new JsonRpc(isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint"), {
     fetch,
   });
 
   try {
-    // Get producers from Api
+    // Get producers from NodeApi
     let results = await rpc.get_producers(true, "", config.get("validation.producer_limit"));
     results = { ...results.rows };
 

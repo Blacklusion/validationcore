@@ -17,7 +17,7 @@ export function sendMessageOrganization(guildName: string, isMainnet: boolean, m
  * Sends API telegram messages for all subscribers of that guild
  * @param {string} guildName = on-chain name of the guild (as tracked in database)
  * @param {boolean} isMainnet = if true, the messages are relevant for mainnet and only users that subscribe to mainnet will receive the messages
- * @param {string} apiEndpoint = url of the Api Endpoint (will not be parsed, could technically be invalid url)
+ * @param {string} apiEndpoint = url of the NodeApi Endpoint (will not be parsed, could technically be invalid url)
  * @param {[string, number][]} messages = all validationMessages as created in the validateAll() method. Messages will be filtered before sent
  */
 export function sendMessageApi(
@@ -33,7 +33,7 @@ export function sendMessageApi(
  * Sends HISTORY telegram messages for all subscribers of that guild
  * @param {string} guildName = on-chain name of the guild (as tracked in database)
  * @param {boolean} isMainnet = if true, the messages are relevant for mainnet and only users that subscribe to mainnet will receive the messages
- * @param {string} apiEndpoint = url of the History Endpoint (will not be parsed, could technically be invalid url)
+ * @param {string} apiEndpoint = url of the NodeHistory Endpoint (will not be parsed, could technically be invalid url)
  * @param {[string, number][]} messages = all validationMessages as created in the validateAll() method. Messages will be filtered before sent
  */
 export function sendMessageHistory(
@@ -62,12 +62,12 @@ export function sendMessageSeed(
 }
 
 /**
- * Universal method to make an Api call for the pager-telegram-method that sends telegram messages to a list of subscribers
+ * Universal method to make an NodeApi call for the pager-telegram-method that sends telegram messages to a list of subscribers
  * @param {string} guildName = on-chain name of the guild (as tracked in database)
  * @param {boolean} isMainnet = if true, the messages are relevant for mainnet and only users that subscribe to mainnet will receive the messages
  * @param {string} headerMessage = Text displayed at the top of the telegram message as bold text
  * @param {[string, number][]} messages = all validationMessages as created in the validateAll() method. Messages will be filtered before sent
- * @param {string} path = specifies which Api route will be called -> specifies if message is organization, api, history or seed
+ * @param {string} path = specifies which NodeApi route will be called -> specifies if message is organization, api, history or seed
  */
 function sendMessage(
   guildName: string,

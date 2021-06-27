@@ -4,14 +4,14 @@ import * as ValidateHistory from "./validate-history";
 import * as ValidateAtomic from "./validate-atomic";
 import { logger } from "../common";
 import { Guild } from "../database/entity/Guild";
-import { Api } from "../database/entity/Api";
+import { NodeApi } from "../database/entity/NodeApi";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
 import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/HttpRequest";
 
 /**
- * Logger Settings for Api
+ * Logger Settings for NodeApi
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "Api-Validation",
@@ -20,13 +20,13 @@ const childLogger: Logger = logger.getChildLogger({
 });
 
 /**
- * Performs all validations for an Api-Node
- * @param {Guild} guild = guild for which the Api is validated (must be tracked in database)
+ * Performs all validations for an NodeApi-Node
+ * @param {Guild} guild = guild for which the NodeApi is validated (must be tracked in database)
  * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
  * @param {string} apiEndpoint = url of the api node (http and https possible)
- * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
+ * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
- * @param {string[]} features = Array of features supplied in the bp.json, describing which features the Api should support
+ * @param {string[]} features = Array of features supplied in the bp.json, describing which features the NodeApi should support
  */
 export async function validateAll(
   guild: Guild,
@@ -35,7 +35,7 @@ export async function validateAll(
   isSsl: boolean,
   locationOk: boolean,
   features: string[]
-): Promise<Api> {
+): Promise<NodeApi> {
   // Check if valid ApiEndpoint url has been provided
   try {
     new URL(apiEndpoint);
@@ -51,7 +51,7 @@ export async function validateAll(
 
   // Create api object for database
   const database = getConnection();
-  const api: Api = new Api();
+  const api: NodeApi = new NodeApi();
   api.guild = guild.name;
   api.location_ok = locationOk;
   api.api_endpoint = apiEndpoint;
@@ -108,7 +108,7 @@ export async function validateAll(
       api.server_version = response.getDataItem(["server_version_string"]);
 
       /**
-       * Test 1.2: Api for correct chain
+       * Test 1.2: NodeApi for correct chain
        */
       api.correct_chain =
         typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
@@ -347,7 +347,7 @@ export async function validateAll(
 
   /**
    * Set all checks ok
-   * (location check is excluded, because a wrong location does not interfere with the function of an Api node
+   * (location check is excluded, because a wrong location does not interfere with the function of an NodeApi node
    */
   // An unpleasant solution, however simplifying this into a single line would cause sideeffects with undefined. This ensures the result will always be a boolean
   if (
@@ -372,7 +372,7 @@ export async function validateAll(
   }
 
   /**
-   * Test History & Atomic Api
+   * Test NodeHistory & NodeAtomic NodeApi
    */
 
   let history;
@@ -396,7 +396,7 @@ export async function validateAll(
   }
 
   /**
-   * Validate if supplied features in bp.json are actually supported by Api
+   * Validate if supplied features in bp.json are actually supported by NodeApi
    */
   api.bp_json_all_features_ok = false;
   let featuresIncorrectMessage = "were not provided";
@@ -434,14 +434,14 @@ export async function validateAll(
   try {
     await database.manager.save(api);
     childLogger.debug(
-      "SAVED \t New Api validation to database for " +
+      "SAVED \t New NodeApi validation to database for " +
         guild.name +
         " " +
         (isMainnet ? "mainnet" : "testnet") +
         " to database"
     );
   } catch (error) {
-    childLogger.fatal("Error while saving new Api validation to database", error);
+    childLogger.fatal("Error while saving new NodeApi validation to database", error);
   }
 
   return api;

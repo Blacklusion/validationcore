@@ -2,19 +2,19 @@ import * as api from "./validate-api";
 import * as seed from "./validate-seed";
 import * as config from "config";
 import { logger } from "../common";
-import { Organization } from "../database/entity/Organization";
+import { Validation } from "../database/entity/Validation";
 import "reflect-metadata";
 import { getConnection } from "typeorm";
 import { Guild } from "../database/entity/Guild";
 import { Logger } from "tslog";
 import { sendMessageOrganization } from "../telegramHandler";
 import { evaluateMessage, writeJsonToDisk, convertArrayToJson } from "../messageHandler";
-import { Api } from "../database/entity/Api";
-import { Seed } from "../database/entity/Seed";
+import { NodeApi } from "../database/entity/NodeApi";
+import { NodeSeed } from "../database/entity/NodeSeed";
 import * as http from "../httpConnection/HttpRequest";
 
 /**
- * Logger Settings for Organization
+ * Logger Settings for Validation
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "Org-Validation",
@@ -34,12 +34,12 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   // Create organization object for database
   const database = getConnection();
-  const organization: Organization = new Organization();
+  const organization: Validation = new Validation();
   organization.guild = guild.name;
   organization.validation_is_mainnet = isMainnet;
 
   // Get last validation of organization, needed to only inform user about changes in validation, but not about already informed problems
-  let lastValidation: Organization = await database.manager.findOne(Organization, {
+  let lastValidation: Validation = await database.manager.findOne(Validation, {
     where: [
       {
         id: isMainnet ? guild.mainnet_last_validation_id : guild.testnet_last_validation_id,
@@ -49,7 +49,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
 
   // If there is no last validation, create dummy object to prevent operations on undefined
   if (!lastValidation) {
-    lastValidation = new Organization();
+    lastValidation = new Validation();
   }
 
   /**
@@ -443,7 +443,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                * Test 3.12: Test P2P Nodes
                */
               // Get last validation from database with same endpoint url
-              let lastSeedValidation: Seed;
+              let lastSeedValidation: NodeSeed;
               if (lastValidation && lastValidation.nodes_seed) {
                 lastSeedValidation = lastValidation.nodes_seed.find((seed) => {
                   return seed.p2p_endpoint === node.p2p_endpoint;
@@ -451,7 +451,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
               }
 
               // Validate Seed Endpoint
-              let seedNode: Seed;
+              let seedNode: NodeSeed;
               if (lastSeedValidation.validation_date.valueOf() <= Date.now() - ((config.get("validation.validation_seed_offset") - 0.5) * config.get("validation.validation_round_interval"))) {
                 seedNode = await seed.validateAll(
                   guild,
@@ -471,10 +471,10 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
             if ((node.node_type == "query" || (Array.isArray(node.node_type) && node.node_type.includes("query"))) && Array.isArray(node.features)) {
               if (node.node_type.includes("chain-api")) {
                 /**
-                 * Test 3.13: Test Api Nodes
+                 * Test 3.13: Test NodeApi Nodes
                  */
                   // Validate Http endpoint
-                const apiNode: Api = await api.validateAll(
+                const apiNode: NodeApi = await api.validateAll(
                   guild,
                   isMainnet,
                   node.api_endpoint,
@@ -482,13 +482,13 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                   locationOk,
                   node.features
                   );
-                // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
+                // Add NodeApi validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
                 if (apiNode) {
                   organization.nodes_api.push(apiNode);
                 }
 
                 // Validate Https endpoint
-                const sslNode: Api = await api.validateAll(
+                const sslNode: NodeApi = await api.validateAll(
                   guild,
                   isMainnet,
                   node.ssl_endpoint,
@@ -496,7 +496,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
                   locationOk,
                   node.features
                 );
-                // Add Api validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
+                // Add NodeApi validation to organization object, if it is not undefined (e.g. undefined if no url was provided)
                 if (sslNode) {
                   organization.nodes_api.push(sslNode);
                 }
@@ -531,7 +531,7 @@ export async function validateAll(guild: Guild, isMainnet: boolean): Promise<boo
    * SAVE results to database
    */
 
-  // Store Organization object to Database
+  // Store Validation object to Database
   await database.manager.save(organization);
   childLogger.debug(
     "SAVED \t New organization validation for " +
@@ -603,9 +603,9 @@ function validateBpLocation(location: any): boolean {
 
               // Get last validation from database with same endpoint url
               // Stores the last validation for http endpoint
-              let lastApiValidation: Api;
+              let lastApiValidation: NodeApi;
               // Stores the last validation for httpS endpoint
-              let lastSslValidation: Api;
+              let lastSslValidation: NodeApi;
 
               if (lastValidation && lastValidation.nodes_api) {
                 lastApiValidation = lastValidation.nodes_api.find((api) => {
