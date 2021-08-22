@@ -1,0 +1,26 @@
+{
+  "nodeHistory_ssl": {
+    "shouldSucceed": true
+  },
+  "nodeHistory_get_transaction": {
+    "path": "/v1/history/get_transaction",
+    "requestMethod": "POST",
+    "payload": "{\"json\": true, \"id\": \"$nodeHistory_get_transaction_id\"}",
+    "variables": ["$nodeHistory_get_transaction_id"],
+    "shouldSucceed": true
+  },
+  "nodeHistory_get_actions": {
+    "path": "/v1/history/get_actions",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"pos\": -1, \"offset\": $nodeHistory_transaction_offset, \"account_name\": \"eosio.token\" }",
+    "variables": ["$nodeHistory_transaction_offset"],
+    "shouldSucceed": true
+  },
+  "nodeHistory_get_key_accounts": {
+    "path": "/v1/history/get_key_accounts",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"public_key\": \"$nodeHistory_public_key\" }",
+    "variables": ["$nodeHistory_public_key"],
+    "shouldSucceed": true
+  }
+}

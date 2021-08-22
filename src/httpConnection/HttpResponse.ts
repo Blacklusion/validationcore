@@ -1,5 +1,5 @@
-import { HttpErrorType } from "./HttpErrorType";
-import { logger } from "../common";
+import { HttpErrorType } from "../validationcore-database-scheme/enum/HttpErrorType";
+import { logger } from "../validationcore-database-scheme/common";
 
 /**
  * Response returned by the http methods in HttpRequest
@@ -15,18 +15,18 @@ export class HttpResponse {
   dataJson: any;
 
   // ElapsedTime between the request was send and the response was received
-  elapsedTimeInMilliseconds: number;
+  private _elapsedTimeInMilliseconds: number;
 
   // If set to true, the request was successful (based on the returned httpCode)
   ok: boolean;
 
   // Returned httpCode returned by the server
-  httpCode: number;
+  private _httpCode: number;
 
   // Stores the error message of a potential error during the request, including invalid domain errors etc.
   errorMessage: string;
 
-  errorType: HttpErrorType;
+  private _errorType: HttpErrorType;
 
   /**
    * Constructor
@@ -36,8 +36,8 @@ export class HttpResponse {
     this.data = undefined;
 
     // Set to -1 to prevent checks on undefined
-    this.httpCode = -1;
-    this.elapsedTimeInMilliseconds = -1;
+    this._httpCode = -1;
+    this._elapsedTimeInMilliseconds = -1;
     this.ok = false;
     this.errorMessage = "";
   }
@@ -49,19 +49,19 @@ export class HttpResponse {
    */
   async parseFetchResponse(response: Response, startTime: number): Promise<void> {
     this.ok = response.ok;
-    this.httpCode = response.status;
+    this._httpCode = response.status;
     this.headers = response.headers;
     this.data = await response.text();
 
     // Check if Request was successful
     if (!this.ok) {
-      this.errorMessage = this.httpCode + " " + response.statusText;
-      this.errorType = HttpErrorType.HTTP;
+      this.errorMessage = this._httpCode + " " + response.statusText;
+      this._errorType = HttpErrorType.HTTP;
     }
 
     // Calculate ElapsedTime
     if (startTime !== undefined) {
-      this.elapsedTimeInMilliseconds = Date.now() - startTime;
+      this._elapsedTimeInMilliseconds = Date.now() - startTime;
     }
 
     // Parse body to json if possible
@@ -73,7 +73,7 @@ export class HttpResponse {
     }
 
     if (!this.ok) {
-      logger.silly(response.url + " => Request not successful" + this.getFormattedErrorMessage());
+      logger.silly(response.url + " => Request not successful: " + this.errorMessage);
     } else {
       logger.silly(response.url + " => Request successful");
     }
@@ -88,7 +88,13 @@ export class HttpResponse {
     // Error is Timeout Error
     if (error.message === "timeout" || (error.code && (error.code === "ETIMEDOUT" || error.code == "ECONNABORTED"))) {
       this.errorMessage = "Timeout during request";
-      this.errorType = HttpErrorType.TIMEOUT;
+      this._errorType = HttpErrorType.TIMEOUT;
+    }
+
+    // Error is Timeout Error
+    else if (error.code && error.code === "ENOTFOUND") {
+      this.errorMessage = "Domain not found";
+      this._errorType = HttpErrorType.DNS;
     }
 
     // Error is SSL error
@@ -98,23 +104,30 @@ export class HttpResponse {
         (error.message && error.message.includes(", reason:")
           ? " (" + error.message.substring(error.message.indexOf(", reason:") + 10, error.message.length - 1) + ")"
           : "");
-      this.errorType = HttpErrorType.SSL;
+      this._errorType = HttpErrorType.SSL;
     }
 
     // The differentiation between other errors is not really necessary
     else if (error.code !== undefined) {
       this.errorMessage = error.code;
-      this.errorType = HttpErrorType.OTHER;
+      // EPROTO Error will fall in this category
+      if (error.code !== "ECONNREFUSED" && error.code !== "EPROTO" && error.code !== "ECONNRESET") {
+        logger.warn(
+          "An undefined error occured: " + error.code + ". Consider adding additional handling for this errorType."
+        );
+        console.log(error.code);
+      }
+      this._errorType = HttpErrorType.OTHER;
     }
 
     // The error is not a FetchError -> This should not be the case
     else {
       this.errorMessage = "Unknown Error";
       logger.warn("An unknown error was tried to be parsed during a httpRequest. This should not be the case: ", error);
-      this.errorType = HttpErrorType.UNKNOWN;
+      this._errorType = HttpErrorType.UNKNOWN;
     }
 
-    logger.debug("ERROR: Request not successful" + this.getFormattedErrorMessage());
+    logger.debug("ERROR: Request not successful: " + this.errorMessage);
   }
 
   /**
@@ -135,13 +148,32 @@ export class HttpResponse {
   }
 
   /**
-   * Returns either an empty string or the error message with leading ": "
-   * Useful for formatting error messages or validation messages, in which the ": " shall only be added if an error message exists
-   * @return {string} = Formatted Error message or empty string
+   * Return null instead of -1, since -1 is the default set in the constructor
    */
-  getFormattedErrorMessage(): string {
-    if (!this.errorMessage || this.errorMessage === "") return "";
-    else return ": " + this.errorMessage;
+  get httpCode(): number {
+    return this._httpCode === -1 ? null : this._httpCode;
+  }
+
+  /**
+   * Return null instead of ErrorType.NULL, since ErrorType.NULL is the default set in the constructor
+   */
+  get errorType(): HttpErrorType {
+    return this._errorType === HttpErrorType.UNKNOWN ? null : this._errorType;
+  }
+
+  /**
+   * Setter method for ErrorType
+   * @param {HttpErrorType} value
+   */
+  set errorType(value: HttpErrorType) {
+    this._errorType = value;
+  }
+
+  /**
+   *
+   */
+  get elapsedTimeInMilliseconds(): number {
+    return this._elapsedTimeInMilliseconds === -1 ? null : this._elapsedTimeInMilliseconds;
   }
 
   /**

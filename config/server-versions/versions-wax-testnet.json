@@ -1,0 +1,76 @@
+{
+  "f16b1833c747c43682f4386fca9cbb327929334a762755ebec17f6f23c9b8a12": {
+    "wax-1.8.0-1.0.0": {
+      "name": "wax 1.8.0",
+      "valid": false
+    },
+    "wax-1.8.1-1.0.0": {
+      "name": "wax 1.8.1",
+      "valid": false
+    },
+    "wax-1.8.2-1.0.0": {
+      "name": "wax 1.8.2",
+      "valid": false
+    },
+    "wax-1.8.3-1.0.0": {
+      "name": "wax 1.8.3",
+      "valid": false
+    },
+    "wax-1.8.4-1.0.0": {
+      "name": "wax 1.8.4",
+      "valid": false
+    },
+    "v2.0.5wax01": {
+      "name": "wax 2.0.5",
+      "valid": false
+    },
+    "v2.0.6wax01": {
+      "name": "wax 2.0.6",
+      "valid": false
+    },
+    "v2.0.6wax02": {
+      "name": "wax 2.0.6",
+      "valid": false
+    },
+    "v2.0.7wax01": {
+      "name": "wax 2.0.7",
+      "valid": false
+    },
+    "v2.0.8wax01": {
+      "name": "wax 2.0.8",
+      "valid": true
+    },
+    "v2.0.8wax02": {
+      "name": "wax 2.0.8",
+      "valid": true
+    },
+    "v2.0.9wax01": {
+      "name": "wax 2.0.9",
+      "valid": true
+    },
+    "v2.1.0wax01": {
+      "name": "wax 2.1.0",
+      "valid": true
+    },
+    "v2.0.10wax01": {
+      "name": "wax 2.0.10",
+      "valid": true
+    },
+    "v2.0.11wax01": {
+      "name": "wax 2.0.11",
+      "valid": true
+    },
+    "v2.0.12wax01": {
+      "name": "wax 2.0.12",
+      "valid": true
+    },
+    "v2.0.13wax01": {
+      "name": "wax 2.0.13",
+      "valid": true
+    },
+    "v2.0.14wax01": {
+      "name": "wax 2.0.14",
+      "valid": true
+    }
+  }
+}

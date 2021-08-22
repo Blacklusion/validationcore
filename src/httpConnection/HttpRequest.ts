@@ -2,8 +2,8 @@ import * as fetch from "node-fetch";
 import * as config from "config";
 import { HttpResponse } from "./HttpResponse";
 import { sleep } from "eosio-protocol";
-import { HttpErrorType } from "./HttpErrorType";
-import { logger } from "../common";
+import { HttpErrorType } from "../validationcore-database-scheme/enum/HttpErrorType";
+import { getChainsConfigItem, logger, validationConfig } from "../validationcore-database-scheme/common";
 
 /**
  * GET Request
@@ -16,7 +16,7 @@ export async function get(
   path = "",
   retryCounter: number = config.get("validation.request_retry_count")
 ): Promise<HttpResponse> {
-  return await request(base, path, retryCounter, true, undefined, undefined);
+  return await httpRequest(base, path, retryCounter, true, undefined, undefined);
 }
 
 /**
@@ -34,7 +34,75 @@ export async function post(
   retryCounter: number = config.get("validation.request_retry_count"),
   contentType = "application/json"
 ): Promise<HttpResponse> {
-  return await request(base, path, retryCounter, false, payloadAsJson, contentType);
+  return await httpRequest(base, path, retryCounter, false, payloadAsJson, contentType);
+}
+
+/**
+ * Allows to make requests based on the schema supplied in ./config/validation-config
+ * @param {string} endpointUrl = url of the API endpoint
+ * @param {string} validationKey = name of the test as specified in the config
+ * @param {string} chainId = ChainId of the validation
+ * @param {string} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ */
+export async function request(
+  endpointUrl: string,
+  validationKey: string,
+  chainId: string,
+  retryCounter: number = config.get("validation.request_retry_count")
+): Promise<HttpResponse> {
+  let path = validationConfig[validationKey].path;
+  let payload = validationConfig[validationKey].payload;
+  try {
+    if (validationConfig[validationKey].variables !== null) {
+      validationConfig[validationKey].variables.forEach((x) => {
+        if (path) path = path.replace(x, getChainsConfigItem(chainId, x));
+        if (payload) payload = payload.replace(x, getChainsConfigItem(chainId, x));
+      });
+    }
+    payload = JSON.parse(payload);
+  } catch (e) {
+    logger.fatal(
+      "Error during reading path and payload from config. Likely an error in ./config/chains.csv or ./config/validation-config/*.json \nPath: " +
+        path +
+        "\nPayload: " +
+        payload +
+        e
+    );
+  }
+
+  if (validationConfig[validationKey].requestMethod.toLowerCase() === "get") {
+    return await get(endpointUrl, path, retryCounter);
+  } else if (validationConfig[validationKey].requestMethod.toLowerCase() === "post") {
+    return await post(endpointUrl, path, payload, retryCounter);
+  } else {
+    logger.fatal("Invalid RequestMethod for " + validationKey + ". Check ./config/validation-config");
+  }
+}
+
+/**
+ * Validates if a url has SSL configured properly
+ * @param {string} url = Url that will be validated
+ * @return {[boolean, string]} = the first argument is true if the check succeeded, the second contains the error message
+ */
+export async function evaluateSSL(url: string): Promise<HttpResponse> {
+  const sslResponse = new HttpResponse();
+  if (!new RegExp("https://.+").test(url)) {
+    sslResponse.ok = false;
+    sslResponse.errorType = HttpErrorType.INVALIDURL;
+    sslResponse.errorMessage = "no https url provided";
+  } else {
+    await get(url, "", 0).then((response) => {
+      if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
+        sslResponse.ok = true;
+      } else {
+        sslResponse.ok = false;
+        sslResponse.errorMessage = response.errorMessage;
+        sslResponse.errorType = response.errorType;
+      }
+    });
+  }
+
+  return sslResponse;
 }
 
 /**
@@ -46,7 +114,7 @@ export async function post(
  * @param {json} payloadAsJson = payload as valid json
  * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
  */
-async function request(
+async function httpRequest(
   base: string,
   path = "",
   retryCounter: number = config.get("validation.request_retry_count"),
@@ -55,16 +123,14 @@ async function request(
   contentType = "application/json"
 ): Promise<HttpResponse> {
   const response = new HttpResponse();
-
   // Check if base url was provided
   if (!base || base === "") {
     response.setErrorMessage("No url was provided");
-    response.errorType = HttpErrorType.OTHER;
+    response.errorType = HttpErrorType.INVALIDURL;
     return response;
   }
 
   // Combine base and path to url
-  // todo: (optional) check for generic domainnames: google.de etc.
   let urlWithPath: URL;
   try {
     // Extract original path (needs to be done, since new URL(path, base) would overwrite the original path)
@@ -81,7 +147,7 @@ async function request(
     }
   } catch (e) {
     response.setErrorMessage("Invalid url formatting");
-    response.errorType = HttpErrorType.OTHER;
+    response.errorType = HttpErrorType.INVALIDURL;
     return response;
   }
 
@@ -130,7 +196,7 @@ async function request(
     await sleep(config.get("validation.request_retry_pause_ms"));
 
     // Try again
-    return request(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType);
+    return httpRequest(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType);
   }
 }
 
@@ -158,6 +224,11 @@ function timeout(promise: Promise<any>): Promise<Response> {
   });
 }
 
+/**
+ * Checks if the performance mode threshold is reached as specified in config/local.toml
+ * @param {number} failedRequests = Number of prior failed requests
+ * @return {number} = returns 0 if performance mode kicks in
+ */
 export function evaluatePerformanceMode(failedRequests: number): number {
   if (
     config.get("validation.performance_mode") &&

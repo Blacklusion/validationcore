@@ -1,0 +1,40 @@
+{
+  "nodeAtomic_ssl": {
+    "shouldSucceed": true
+  },
+  "nodeAtomic_health": {
+    "path": "/health",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeAtomic_alive": {
+    "path": "/alive",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeAtomic_assets": {
+    "path": "/atomicassets/v1/assets/$nodeAtomic_asset_id",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeAtomic_asset_id"],
+    "shouldSucceed": true
+  },
+  "nodeAtomic_collections": {
+    "path": "/atomicassets/v1/collections/$nodeAtomic_collection_id",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeAtomic_collection_id"],
+    "shouldSucceed": true
+  },
+  "nodeAtomic_schemas": {
+    "path": "/atomicassets/v1/schemas/$nodeAtomic_schema",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeAtomic_schema"],
+    "shouldSucceed": true
+  }
+}

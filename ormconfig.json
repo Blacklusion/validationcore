@@ -7,12 +7,12 @@
   "database": "leave_blank",
   "synchronize": true,
   "logging": false,
-  "entities": ["src/database/entity/**/*.ts"],
-  "migrations": ["src/database/migration/**/*.ts"],
-  "subscribers": ["src/database/subscriber/**/*.ts"],
+  "entities": ["/src/validationcore-database-scheme/entity/**/*.ts"],
+  "migrations": ["/src/validationcore-database-scheme/migration/**/*.ts"],
+  "subscribers": ["/src/validationcore-database-scheme/subscriber/**/*.ts"],
   "cli": {
-    "entitiesDir": "src/database/entity",
-    "migrationsDir": "src/database/migration",
-    "subscribersDir": "src/database/subscriber"
+    "entitiesDir": "/src/validationcore-database-scheme/entity",
+    "migrationsDir": "/src/validationcore-database-scheme/migration",
+    "subscribersDir": "/src/validationcore-database-scheme/subscriber"
   }
 }

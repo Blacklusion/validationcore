@@ -1,0 +1,61 @@
+{
+  "nodeApi_ssl": {
+    "shouldSucceed": true
+  },
+  "nodeApi_get_info": {
+    "path": "/v1/chain/get_info",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeApi_block_one": {
+    "path": "/v1/chain/get_block",
+    "requestMethod": "POST",
+    "payload": "{ \"block_num_or_id\": 1, \"json\": true }",
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeApi_verbose_error": {
+    "path": "/v1/chain/should_return_error",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true }",
+    "variables": null,
+    "shouldSucceed": false
+  },
+  "nodeApi_abi_serializer": {
+    "path": "/v1/chain/get_block",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"block_num_or_id\": \"$nodeApi_block_id\" }",
+    "variables": ["$nodeApi_block_id", "$nodeApi_expected_block_count"],
+    "shouldSucceed": true
+  },
+  "nodeApi_basic_symbol": {
+    "path": "/v1/chain/get_currency_balance",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"account\": \"$nodeApi_account\", \"code\": \"eosio.token\", \"symbol\": \"$nodeApi_symbol\" }",
+    "variables": ["$nodeApi_account", "$nodeApi_symbol"],
+    "shouldSucceed": true
+  },
+  "nodeApi_producer_api": {
+    "path": "/v1/producer/get_integrity_hash",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": false
+  },
+  "nodeApi_db_size_api": {
+    "path": "/v1/db_size/get",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": false
+  },
+  "nodeApi_net_api": {
+    "path": "/v1/net/connections",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": false
+  }
+}

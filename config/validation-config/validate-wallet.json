@@ -1,0 +1,19 @@
+{
+  "nodeWallet_ssl": {
+    "shouldSucceed": true
+  },
+  "nodeWallet_accounts": {
+    "path": "/v1/chain/get_accounts_by_authorizers",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"accounts\": [\"$nodeWallet_account\"] }",
+    "variables": ["$nodeWallet_account"],
+    "shouldSucceed": true
+  },
+  "nodeWallet_keys": {
+    "path": "/v1/chain/get_accounts_by_authorizers",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"keys\": [\"$nodeWallet_key\"] }",
+    "variables": ["$nodeWallet_key"],
+    "shouldSucceed": true
+  }
+}

@@ -1,17 +1,23 @@
 import * as config from "config";
-import { HttpErrorType } from "../httpConnection/HttpErrorType";
-import * as ValidateHistory from "./validate-history";
-import { logger } from "../common";
-import { Guild } from "../database/entity/Guild";
-import { Api } from "../database/entity/Api";
+import { HttpErrorType } from "../validationcore-database-scheme/enum/HttpErrorType";
+import {
+  allChecksOK,
+  combineValidationLevel,
+  calculateValidationLevel,
+  getChainsConfigItem,
+  logger,
+  serverVersionsConfig,
+} from "../validationcore-database-scheme/common";
+import { Guild } from "../validationcore-database-scheme/entity/Guild";
+import { NodeApi } from "../validationcore-database-scheme/entity/NodeApi";
 import { getConnection } from "typeorm";
 import { Logger } from "tslog";
-import { sendMessageApi } from "../telegramHandler";
 import * as http from "../httpConnection/HttpRequest";
-import { evaluateMessage, convertArrayToJson } from "../messageHandler";
+import { isURL } from "validator";
+import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
 
 /**
- * Logger Settings for Api
+ * Logger Settings for NodeApi
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "Api-Validation",
@@ -20,545 +26,286 @@ const childLogger: Logger = logger.getChildLogger({
 });
 
 /**
- * Performs all validations for an Api-Node
- * @param {Guild} guild = guild for which the Api is validated (must be tracked in database)
- * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
- * @param {Api} lastValidation = last validation of the SAME Api Endpoint
- * @param {string} apiEndpoint = url of the api node (http and https possible)
- * @param {boolean} isSsl = if true, it is also validated if TLS is working. Then the Api will only be considered healthy, if all checks pass and if TLS is working
+ * Performs all validations for an NodeApi-Node
+ * @param {Guild} guild = guild for which the NodeApi is validated (must be tracked in database)
+ * @param {string} chainId = chainId of chain that is validated
+ * @param {string} endpointUrl = url of the api node (http and https possible)
+ * @param {boolean} isSSL = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
- * @param {string[]} features = Array of features supplied in the bp.json, describing which features the Api should support
  */
-export async function validateAll(
+export async function validateApi(
   guild: Guild,
-  isMainnet: boolean,
-  lastValidation: Api,
-  apiEndpoint: string,
-  isSsl: boolean,
-  locationOk: boolean,
-  features: string[]
-): Promise<[Api, any, any]> {
-  // Check if valid ApiEndpoint url has been provided
-  try {
-    new URL(apiEndpoint);
-  } catch (e) {
-    return undefined;
-  }
+  chainId: string,
+  endpointUrl: string,
+  isSSL: boolean,
+  locationOk: boolean
+): Promise<NodeApi> {
+  if (!endpointUrl) return undefined;
 
   // Counts how many requests have failed. If performance mode is enabled, future requests may not be performed, if to many requests already failed
   let failedRequestCounter = 0;
 
-  // Set general variables
-  const chainId = isMainnet ? config.get("mainnet.chain_id") : config.get("testnet.chain_id");
-  const validationMessages: Array<[string, number]> = [];
-
   // Create api object for database
-  const database = getConnection();
-  const api: Api = new Api();
+  const database = getConnection(chainId);
+  const api: NodeApi = new NodeApi();
   api.guild = guild.name;
-  api.location_ok = locationOk;
-  api.api_endpoint = apiEndpoint;
-  api.validation_is_mainnet = isMainnet;
+  api.endpoint_url = endpointUrl;
 
-  // Create dummy api object if lastValidation is undefined
-  if (!lastValidation) lastValidation = new Api();
+  if (getChainsConfigItem(chainId, "nodeApi_location"))
+    api.location_ok = calculateValidationLevel(locationOk, chainId, "nodeApi_location_level");
+
+  // Check if valid EndpointUrl has been provided
+  if (getChainsConfigItem(chainId, "nodeApi_endpoint_url_ok")) {
+    const endpointUrlOk = isURL(endpointUrl, {
+      require_protocol: true,
+    });
+
+    api.endpoint_url_ok = calculateValidationLevel(endpointUrlOk, chainId, "nodeApi_endpoint_url_ok_level");
+  }
 
   /**
    * SSL Check
    */
-  api.is_ssl = isSsl;
-  if (isSsl) {
-    let sslMessage = "";
-    if (!new RegExp("https://.+").test(apiEndpoint)) {
-      api.ssl_ok = false;
-      sslMessage = "not ok, no https url provided";
-    } else {
-      await http.get(apiEndpoint, "", 0).then((response) => {
-        if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
-          api.ssl_ok = true;
-        } else {
-          api.ssl_ok = false;
-          sslMessage = "not ok: " + response.getFormattedErrorMessage();
-        }
-      });
-    }
-    validationMessages.push(evaluateMessage(lastValidation.ssl_ok, api.ssl_ok, "TLS", "ok", sslMessage));
-
-    if (!api.ssl_ok) failedRequestCounter++;
+  api.is_ssl = isSSL;
+  if (isSSL && getChainsConfigItem(chainId, "nodeApi_ssl")) {
+    http.evaluateSSL(endpointUrl).then((response) => {
+      api.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeApi_ssl_level");
+      api.ssl_errortype = response.errorType;
+      if (api.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+    });
   }
 
   /**
    * 1. Test: Basic Checks
    */
-  await http
-    .post(apiEndpoint, "/v1/chain/get_info", { json: true }, http.evaluatePerformanceMode(failedRequestCounter))
-    .then((response) => {
-      api.get_info_ok = response.ok && response.isJson();
-      api.get_info_ms = response.elapsedTimeInMilliseconds;
+  if (getChainsConfigItem(chainId, "nodeApi_get_info")) {
+    await http
+      .request(endpointUrl, "nodeApi_get_info", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .then((response) => {
+        const getInfoOk = response.ok && response.isJson();
+        api.get_info_ok = calculateValidationLevel(getInfoOk, chainId, "nodeApi_get_info_level");
+        api.get_info_ms = response.elapsedTimeInMilliseconds;
+        api.get_info_errortype = response.errorType;
+        api.get_info_httpcode = response.httpCode;
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.get_info_ok,
-          api.get_info_ok,
-          "Get_info request",
-          "successful",
-          "not successful" + response.getFormattedErrorMessage()
-        )
-      );
-
-      if (!api.get_info_ok) {
-        failedRequestCounter++;
-        return;
-      }
-
-      /**
-       * Test 1.1: Server Version
-       */
-      const serverVersions: Array<string> = config.get(
-        isMainnet ? "mainnet.server_versions" : "testnet.server_versions"
-      );
-      const serverVersion = response.getDataItem(["server_version_string"])
-        ? response.getDataItem(["server_version_string"])
-        : "unknown";
-      api.server_version_ok = serverVersions.includes(serverVersion);
-      api.server_version = response.getDataItem(["server_version_string"]);
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.server_version_ok,
-          api.server_version_ok,
-          "Server version " + serverVersion + " is",
-          "valid",
-          "invalid"
-        )
-      );
-
-      /**
-       * Test 1.2: Api for correct chain
-       */
-      api.correct_chain =
-        typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.correct_chain,
-          api.correct_chain,
-          "Api is provided for the",
-          "correct chain",
-          "wrong chain"
-        )
-      );
-
-      /**
-       * Test 1.3: Head Block up to date
-       */
-      let headBlockIncorrectMessage = "";
-      if (typeof response.getDataItem(["head_block_time"]) === "string") {
-        // Get current time
-        let currentDate: number = Date.now();
-
-        // Use time of http request if available in order to avoid server or validation time delay
-        if (typeof response.headers.get("date") === "number") {
-          currentDate = new Date(response.headers.get("date")).getTime();
+        if (api.get_info_ok !== ValidationLevel.SUCCESS) {
+          failedRequestCounter++;
+          return;
         }
 
-        // "+00:00" is necessary for defining date as UTC
-        const timeDelta: number =
-          currentDate - new Date(response.getDataItem(["head_block_time"]) + "+00:00").getTime();
-
-        // Check if headBlock is within the allowed delta
-        api.head_block_delta_ok = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
-        api.head_block_delta_ms = timeDelta;
-
-        // Format message if head block delta is not within the allowed range
-        if (!api.head_block_delta_ok) {
-          headBlockIncorrectMessage =
-            ": " +
-            timeDelta / 1000 +
-            "sec behind. Only a delta of " +
-            config.get("validation.api_head_block_time_delta") / 1000 +
-            "sec is tolerated";
+        /**
+         * Test 1.1: Server Version
+         */
+        if (getChainsConfigItem(chainId, "nodeApi_server_version")) {
+          const serverVersion = response.getDataItem(["server_version_string"])
+            ? response.getDataItem(["server_version_string"])
+            : "";
+          // todo: test code
+          const serverVersionOk =
+            serverVersionsConfig[chainId][serverVersion] !== undefined &&
+            serverVersionsConfig[chainId][serverVersion]["valid"];
+          api.server_version_ok = calculateValidationLevel(serverVersionOk, chainId, "nodeApi_server_version_level");
+          api.server_version = serverVersion === "" ? null : serverVersion;
         }
-      } else {
-        api.head_block_delta_ok = false;
-        headBlockIncorrectMessage = ": could not be read from api";
-      }
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.head_block_delta_ok,
-          api.head_block_delta_ok,
-          "Head block",
-          "is up-to-date",
-          "is not up-to-date" + headBlockIncorrectMessage
-        )
-      );
-    });
 
+        /**
+         * Test 1.2: NodeApi for correct chain
+         */
+        if (getChainsConfigItem(chainId, "nodeApi_correct_chain")) {
+          const correctChain: boolean =
+            typeof response.getDataItem(["chain_id"]) === "string" && response.getDataItem(["chain_id"]) === chainId;
+          api.correct_chain = calculateValidationLevel(correctChain, chainId, "nodeApi_correct_chain_level");
+        }
+
+        /**
+         * Test 1.3: Head Block up to date
+         */
+        if (getChainsConfigItem(chainId, "nodeApi_head_block_delta")) {
+          if (typeof response.getDataItem(["head_block_time"]) === "string") {
+            // Get current time
+            let currentDate: number = Date.now();
+
+            // Use time of http request if available in order to avoid server or validation time delay
+            if (typeof response.headers.get("date") === "number") {
+              currentDate = new Date(response.headers.get("date")).getTime();
+            }
+
+            // "+00:00" is necessary for defining date as UTC
+            const timeDelta: number =
+              currentDate - new Date(response.getDataItem(["head_block_time"]) + "+00:00").getTime();
+
+            // Check if headBlock is within the allowed delta
+            const headBlockDeltaOk = Math.abs(timeDelta) < config.get("validation.api_head_block_time_delta");
+            api.head_block_delta_ok = calculateValidationLevel(
+              headBlockDeltaOk,
+              chainId,
+              "nodeApi_head_block_delta_level"
+            );
+            api.head_block_delta_ms = timeDelta;
+
+          } else {
+            api.head_block_delta_ok = calculateValidationLevel(false, chainId, "nodeApi_head_block_delta_level");
+          }
+        }
+      });
+  }
   /**
    * Test 2: Block one exists
    */
-  await http
-    .post(
-      apiEndpoint,
-      "/v1/chain/get_block",
-      { block_num_or_id: 1, json: true },
-      http.evaluatePerformanceMode(failedRequestCounter)
-    )
-    .then((response) => {
-      api.block_one_ok = response.ok && response.isJson();
-      api.block_one_ms = response.elapsedTimeInMilliseconds;
+  if (getChainsConfigItem(chainId, "nodeApi_block_one")) {
+    await http
+      .request(endpointUrl, "nodeApi_block_one", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .then((response) => {
+        const blockOneOk = response.ok && response.isJson();
+        api.block_one_ok = calculateValidationLevel(blockOneOk, chainId, "nodeApi_block_one_level");
+        api.block_one_ms = response.elapsedTimeInMilliseconds;
+        api.block_one_errortype = response.errorType;
+        api.block_one_httpcode = response.httpCode;
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.block_one_ok,
-          api.block_one_ok,
-          "Block one test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
-
-      if (!api.block_one_ok) failedRequestCounter++;
-    });
+        if (api.block_one_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+      });
+  }
 
   /**
    * Test 3: Verbose Error
    */
-  await http.post(apiEndpoint, "/v1/chain/should_return_error", { json: true }, 0).then((response) => {
-    api.verbose_error_ms = response.elapsedTimeInMilliseconds;
-    // todo: ensure no check on undefined
-    api.verbose_error_ok =
-      !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.verbose_error_ok,
-        api.verbose_error_ok,
-        "Verbose Error test",
-        "passed",
-        "not passed" + response.getFormattedErrorMessage()
-      )
-    );
+  if (getChainsConfigItem(chainId, "nodeApi_verbose_error")) {
+    await http.request(endpointUrl, "nodeApi_verbose_error", chainId, 0).then((response) => {
+      api.verbose_error_ms = response.elapsedTimeInMilliseconds;
+      // todo: ensure no check on undefined
+      const verboseErrorOk =
+        !response.ok && response.isJson() && Object.keys(response.getDataItem(["error", "details"])).length != 0;
+      api.verbose_error_ok = calculateValidationLevel(verboseErrorOk, chainId, "nodeApi_verbose_error_level");
+      api.verbose_error_errortype = response.errorType;
+      api.verbose_error_httpcode = response.httpCode;
 
-    if (!api.verbose_error_ok) failedRequestCounter++;
-  });
+      if (api.verbose_error_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+    });
+  }
 
   /**
    * Test 4: abi serializer
    */
-  if (
-    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") &&
-    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count")
-  ) {
+  if (getChainsConfigItem(chainId, "nodeApi_abi_serializer")) {
+    let expectedBlockCount = -1;
+    try {
+      expectedBlockCount = Number.parseInt(getChainsConfigItem(chainId, "$nodeApi_expected_block_count"));
+    } catch (e) {
+      logger.fatal(
+        "Error during parsing $nodeApi_expected_block_count from config/chains.csv. This will result in wrong validationresults."
+      );
+    }
     await http
-      .post(
-        apiEndpoint,
-        "/v1/chain/get_block",
-        {
-          json: true,
-          block_num_or_id: config.get(isMainnet ? "mainnet.api_test_big_block" : "testnet.api_test_big_block"),
-        },
-        http.evaluatePerformanceMode(failedRequestCounter)
-      )
+      .request(endpointUrl, "nodeApi_abi_serializer", chainId, http.evaluatePerformanceMode(failedRequestCounter))
       .then((response) => {
         api.abi_serializer_ms = response.elapsedTimeInMilliseconds;
-        api.abi_serializer_ok =
+        const abiSerializerOk =
           response.ok &&
           response.getDataItem(["transactions"]) &&
-          Object.keys(response.getDataItem(["transactions"])).length ==
-            config.get(
-              isMainnet
-                ? "mainnet.api_test_big_block_transaction_count"
-                : "testnet.api_test_big_block_transaction_count"
-            );
+          Object.keys(response.getDataItem(["transactions"])).length === expectedBlockCount;
+        api.abi_serializer_ok = calculateValidationLevel(abiSerializerOk, chainId, "nodeApi_abi_serializer_level");
+        api.abi_serializer_errortype = response.errorType;
+        api.abi_serializer_httpcode = response.httpCode;
 
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.abi_serializer_ok,
-            api.abi_serializer_ok,
-            "Abi serializer test",
-            "passed",
-            "not passed" + response.getFormattedErrorMessage()
-          )
-        );
-
-        if (!api.abi_serializer_ok) failedRequestCounter++;
+        if (api.abi_serializer_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
       });
   }
 
   /**
    * Test 5: basic symbol
    */
-  await http
-    .post(
-      apiEndpoint,
-      "/v1/chain/get_currency_balance",
-      {
-        json: true,
-        account: config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account"),
-        code: "eosio.token",
-        symbol: config.get((isMainnet ? "mainnet" : "testnet") + ".api_currency_symbol"),
-      },
-      http.evaluatePerformanceMode(failedRequestCounter)
-    )
-    .then((response) => {
-      api.basic_symbol_ok = response.ok && Array.isArray(response.dataJson) && response.dataJson.length == 1;
-      api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
+  if (getChainsConfigItem(chainId, "nodeApi_basic_symbol")) {
+    await http
+      .request(endpointUrl, "nodeApi_basic_symbol", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .then((response) => {
+        const basicSymbolOk = response.ok && Array.isArray(response.dataJson) && response.dataJson.length == 1;
+        api.basic_symbol_ok = calculateValidationLevel(basicSymbolOk, chainId, "nodeApi_basic_symbol_level");
+        api.basic_symbol_ms = response.elapsedTimeInMilliseconds;
+        api.basic_symbol_errortype = response.errorType;
+        api.basic_symbol_httpcode = response.httpCode;
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.basic_symbol_ok,
-          api.basic_symbol_ok,
-          "Basic symbol test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
-
-      if (!api.basic_symbol_ok) failedRequestCounter++;
-    });
+        if (api.basic_symbol_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+      });
+  }
 
   /**
    * Test 6: producer api disabled
    */
-  await http.get(apiEndpoint, "/v1/producer/get_integrity_hash", 0).then((response) => {
-    // Set status in database
-    api.producer_api_ms = response.elapsedTimeInMilliseconds;
-    // Test should be successful if a html page is returned, hence !response.isJson()
-    api.producer_api_off =
-      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+  if (getChainsConfigItem(chainId, "nodeApi_producer_api")) {
+    await http.request(endpointUrl, "nodeApi_producer_api", chainId, 0).then((response) => {
+      // Set status in database
+      api.producer_api_ms = response.elapsedTimeInMilliseconds;
+      // Test should be successful if a html page is returned, hence !response.isJson()
+      const producerApiOff =
+        (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+      api.producer_api_off = calculateValidationLevel(producerApiOff, chainId, "nodeApi_producer_api_level");
 
-    // Create error message
-    let producerApiIncorrectMessage = "is enabled. This feature should be disabled";
-    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-      producerApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-    }
+      api.producer_api_errortype = response.errorType;
+      api.producer_api_httpcode = response.httpCode;
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.producer_api_off,
-        api.producer_api_off,
-        "Producer api",
-        "is disabled",
-        producerApiIncorrectMessage
-      )
-    );
-
-    if (!api.producer_api_off) failedRequestCounter++;
-  });
+      if (api.producer_api_off !== ValidationLevel.SUCCESS) failedRequestCounter++;
+    });
+  }
 
   /**
    * Test 7: db_size api disabled
    */
-  await http.get(apiEndpoint, "/v1/db_size/get", 0).then((response) => {
-    // Set status in database
-    api.db_size_api_ms = response.elapsedTimeInMilliseconds;
-    // Test should be successful if a html page is returned, hence !response.isJson()
-    api.db_size_api_off =
-      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+  if (getChainsConfigItem(chainId, "nodeApi_db_size_api")) {
+    await http.request(endpointUrl, "nodeApi_db_size_api", chainId, 0).then((response) => {
+      // Set status in database
+      api.db_size_api_ms = response.elapsedTimeInMilliseconds;
+      // Test should be successful if a html page is returned, hence !response.isJson()
+      const dbSizeApiOff =
+        (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+      api.db_size_api_off = calculateValidationLevel(dbSizeApiOff, chainId, "nodeApi_db_size_api_level");
 
-    // Create error message
-    let dbSizeIncorrectMessage = "is enabled. This feature should be disabled";
-    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-      dbSizeIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-    }
+      api.db_size_api_errortype = response.errorType;
+      api.db_size_api_httpcode = response.httpCode;
 
-    validationMessages.push(
-      evaluateMessage(
-        lastValidation.db_size_api_off,
-        api.db_size_api_off,
-        "Db_size api",
-        "is disabled",
-        dbSizeIncorrectMessage
-      )
-    );
-
-    if (!api.db_size_api_off) failedRequestCounter++;
-  });
+      if (api.db_size_api_off !== ValidationLevel.SUCCESS) failedRequestCounter++;
+    });
+  }
 
   /**
    * Test 8: net api disabled
    */
-  await http.get(apiEndpoint, "/v1/net/connections", 0).then((response) => {
-    // Set status in database
-    api.net_api_ms = response.elapsedTimeInMilliseconds;
-    // Test should be successful if a html page is returned, hence !response.isJson()
-    api.net_api_off =
-      (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+  if (getChainsConfigItem(chainId, "nodeApi_net_api")) {
+    await http.request(endpointUrl, "nodeApi_net_api", chainId, 0).then((response) => {
+      // Set status in database
+      api.net_api_ms = response.elapsedTimeInMilliseconds;
+      // Test should be successful if a html page is returned, hence !response.isJson()
+      const netApiOff =
+        (!response.ok && response.errorType === HttpErrorType.HTTP && response.httpCode > 100) || !response.isJson();
+      api.net_api_off = calculateValidationLevel(netApiOff, chainId, "nodeApi_net_api_level");
 
-    // Create error message
-    let netApiIncorrectMessage = "is enabled. This feature should be disabled";
-    if (!response.ok && response.errorType !== HttpErrorType.HTTP) {
-      netApiIncorrectMessage = "could not be validated" + response.getFormattedErrorMessage();
-    }
+      api.net_api_errortype = response.errorType;
+      api.net_api_httpcode = response.httpCode;
 
-    validationMessages.push(
-      evaluateMessage(lastValidation.net_api_off, api.net_api_off, "Net api", "is disabled", netApiIncorrectMessage)
-    );
-
-    if (!api.net_api_off) failedRequestCounter++;
-  });
-
-  /**
-   * Test 9: Wallet - get_accounts_by_authorizers
-   */
-  await http
-    .post(
-      apiEndpoint,
-      "/v1/chain/get_accounts_by_authorizers",
-      {
-        json: true,
-        accounts: [config.get((isMainnet ? "mainnet" : "testnet") + ".api_test_account")],
-      },
-      http.evaluatePerformanceMode(failedRequestCounter)
-    )
-    .then((response) => {
-      api.wallet_accounts_ok = response.ok && response.isJson();
-      api.wallet_accounts_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.wallet_accounts_ok,
-          api.wallet_accounts_ok,
-          "Wallet get_accounts_by_authorizers by accounts test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
-
-      if (!api.wallet_accounts_ok) failedRequestCounter++;
+      if (api.net_api_off !== ValidationLevel.SUCCESS) failedRequestCounter++;
     });
-
-  /**
-   * Test 9: Wallet - get_accounts_by_authorizers
-   */
-  await http
-    .post(
-      apiEndpoint,
-      "/v1/chain/get_accounts_by_authorizers",
-      {
-        json: true,
-        keys: [config.get((isMainnet ? "mainnet" : "testnet") + ".history_test_public_key")],
-      },
-      http.evaluatePerformanceMode(failedRequestCounter)
-    )
-    .then((response) => {
-      api.wallet_keys_ok = response.ok && response.isJson();
-      api.wallet_keys_ms = response.elapsedTimeInMilliseconds;
-
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.wallet_keys_ok,
-          api.wallet_keys_ok,
-          "Wallet get_accounts_by_authorizers by keys test",
-          "passed",
-          "not passed" + response.getFormattedErrorMessage()
-        )
-      );
-
-      if (!api.wallet_keys_ok) failedRequestCounter++;
-    });
-
-  api.wallet_all_checks_ok = api.wallet_accounts_ok && api.wallet_keys_ok;
+  }
 
   /**
    * Set all checks ok
-   * (location check is excluded, because a wrong location does not interfere with the function of an Api node
    */
-  // An unpleasant solution, however simplifying this into a single line would cause sideeffects with undefined. This ensures the result will always be a boolean
-  if (
-    api.server_version_ok &&
-    api.correct_chain &&
-    api.head_block_delta_ok &&
-    api.block_one_ok &&
-    api.block_one_ok &&
-    api.verbose_error_ok &&
-    (config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block") &&
-    config.has(isMainnet ? "mainnet" : "testnet" + ".api_test_big_block_transaction_count")
-      ? api.abi_serializer_ok
-      : true) &&
-    api.basic_symbol_ok &&
-    api.producer_api_off &&
-    api.db_size_api_off &&
-    api.net_api_off
-  ) {
-    api.all_checks_ok = true;
-  } else {
-    api.all_checks_ok = false;
-  }
+  const validations: [string, ValidationLevel][] = [
+    ["nodeApi_location", api.location_ok],
+    ["nodeApi_endpoint_url_ok", api.endpoint_url_ok],
+    ["nodeApi_get_info", api.get_info_ok],
+    ["nodeApi_server_version", api.server_version_ok],
+    ["nodeApi_correct_chain", api.correct_chain],
+    ["nodeApi_head_block_delta", api.head_block_delta_ok],
+    ["nodeApi_block_one", api.block_one_ok],
+    ["nodeApi_verbose_error", api.verbose_error_ok],
+    ["nodeApi_abi_serializer", api.abi_serializer_ok],
+    ["nodeApi_basic_symbol", api.basic_symbol_ok],
+    ["nodeApi_producer_api", api.producer_api_off],
+    ["nodeApi_db_size_api", api.db_size_api_off],
+    ["nodeApi_net_api", api.net_api_off],
+  ];
+  if (isSSL) validations.push(["nodeApi_ssl", api.ssl_ok]);
 
-  /**
-   * Test History
-   */
-
-  let history;
-  if (api.all_checks_ok) {
-    history = await ValidateHistory.validateAll(
-      guild,
-      isMainnet,
-      lastValidation.history_validation,
-      apiEndpoint,
-      isSsl
-    );
-
-    if (Array.isArray(history) && history[0]) {
-      api.history_validation = history[0];
-    }
-  }
-
-  /**
-   * Validate if supplied features in bp.json are actually supported by Api
-   */
-  api.bp_json_all_features_ok = false;
-  let featuresIncorrectMessage = "were not provided";
-  if (features !== undefined) {
-    featuresIncorrectMessage = "not ok";
-    api.bp_json_all_features_ok = true;
-
-    const testedFeatures: [string, boolean][] = [
-      ["chain-api", api.all_checks_ok],
-      ["account-query", api.wallet_all_checks_ok],
-      ["history-v1", api.history_validation !== undefined && api.history_validation.history_all_checks_ok],
-      ["hyperion-v2", api.history_validation !== undefined && api.history_validation.hyperion_all_checks_ok],
-    ];
-
-    testedFeatures.forEach((feature) => {
-      if (features.includes(feature[0])) {
-        if (!feature[1]) {
-          api.bp_json_all_features_ok = false;
-          featuresIncorrectMessage += ', "' + feature[0] + '" (not working, but was included in features array)';
-        }
-      } else {
-        if (feature[1]) {
-          api.bp_json_all_features_ok = false;
-          featuresIncorrectMessage += ', "' + feature[0] + '" (working, but was not not included in features array)';
-        }
-      }
-    });
-  }
-
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.bp_json_all_features_ok,
-      api.bp_json_all_features_ok,
-      "Supplied features in bp.json are",
-      "ok",
-      featuresIncorrectMessage
-    )
-  );
-
-  validationMessages.push(
-    evaluateMessage(lastValidation.all_checks_ok, api.all_checks_ok, "Chain Api", "healthy", "not healthy")
-  );
-
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.wallet_all_checks_ok,
-      api.wallet_all_checks_ok,
-      "Account Query Api is",
-      "healthy",
-      "not healthy"
-    )
-  );
+  api.all_checks_ok = allChecksOK(validations, chainId);
 
   /**
    * Store results in Database
@@ -566,24 +313,15 @@ export async function validateAll(
   try {
     await database.manager.save(api);
     childLogger.debug(
-      "SAVED \t New Api validation to database for " +
+      "SAVED \t New NodeApi validation to database for " +
         guild.name +
         " " +
-        (isMainnet ? "mainnet" : "testnet") +
+        getChainsConfigItem(chainId, "name") +
         " to database"
     );
   } catch (error) {
-    childLogger.fatal("Error while saving new Api validation to database", error);
+    childLogger.fatal("Error while saving new NodeApi validation to database", error);
   }
 
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageApi(guild.name, isMainnet, apiEndpoint, validationMessages);
-
-  return [
-    api,
-    convertArrayToJson(validationMessages, apiEndpoint),
-    Array.isArray(history) && history.length == 2 ? history[1] : undefined,
-  ];
+  return api;
 }

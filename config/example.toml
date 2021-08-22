@@ -5,6 +5,9 @@
 #                                   #           \__/\  /\____|__  /___/\  \
 #####################################                \/         \/      \_/
 
+# ====================================================================================
+#       General PROGRAM SETTINGS
+# ====================================================================================
 [general]
     # Internal use only. Will not be seen by potential telegram subscribers
     name = 'wax-pager'
@@ -16,10 +19,9 @@
     # Useful for analytic purposes without telegram notifications
     pager_mode = true
 
-    # Directory used to save json files for every guild containing the last validation messages
-    # Can be accessed by other applications or Apis e.g. for the creation of stat websites
-    json_directory = "/jsons/"
-
+# ====================================================================================
+#       TELEGRAM SETTINGS
+# ====================================================================================
 [telegram]
     # Public Blacklusion Pager Telegram service (accessible for the user)
     # Leave blank if pager_mode is disabled
@@ -28,6 +30,9 @@
     # Private Telegram service (used for reporting errors to administrator)
     private_url = 'urlhere'
 
+# ====================================================================================
+#       CHAIN SETTINGS (will be replaced soon)
+# ====================================================================================
 [chains]
     [mainnet]
     name = 'wax'
@@ -51,29 +56,42 @@
     api_currency_symbol = "WAX"
     api_test_account = "nation.wax"
 
-# Validation Settings
+# ====================================================================================
+#       VALIDATOR SETTINGS
+# ====================================================================================
 [validation]
+    ## Specifies how often certain aspects of a guild will be validated
+    # Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
+    validation_round_interval = 600000
+    # Determines how often Seed Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
+    validation_seed_offset = 3
+
+    ## Settings for the http requests
     # If a request fails, it will be retried x times (this value may be overwritten by requests are suppose to fail)
     request_retry_count = 4
     # Pause between retry of failed requests
     request_retry_pause_ms = 2500
     # Request will be canceled after x ms
     request_timeout_ms = 7000
-    # Offset of getProducers request => max. x producers will be tracked in database
+
+    ## Validation Settings specific to certain features (e.g seed or history)
+    # Offset of getProducers request => max. x producers will be tracked in validationcore-database-scheme
     producer_limit = 500
     p2p_block_count = 10
     p2p_ok_speed = 2
     api_head_block_time_delta = 10000
-    history_transaction_offset = 100
+    # history_transaction_offset = 100
     history_actions_block_time_delta = 7200000
+    atomic_tolerated_missing_blocks = "??"
     hyperion_query_time_ms = 400
     # Valid social services in bp.json
     social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium", "hive"]
 
-# Database connection configuration
+# ====================================================================================
+#       DATABASE CONNECTION CONFIGURATION
+# ====================================================================================
 [database]
     postgres_host = "localhost"
     postgres_port = 5432
     postgres_user = 'uniqueNameHere'
     postgres_password = 'uniquePasswordHere'
-    postgres_db = 'wax_pager'

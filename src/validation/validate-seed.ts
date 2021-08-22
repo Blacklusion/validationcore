@@ -7,17 +7,23 @@ import { sleep } from "eosio-protocol";
 import * as config from "config";
 import * as stream from "stream";
 import fetch = require("node-fetch");
-import { logger } from "../common";
+import {
+  combineValidationLevel,
+  calculateValidationLevel,
+  getChainsConfigItem,
+  logger,
+  allChecksOK,
+} from "../validationcore-database-scheme/common";
 import { getConnection } from "typeorm";
-import { Seed } from "../database/entity/Seed";
-import { Guild } from "../database/entity/Guild";
+import { NodeSeed } from "../validationcore-database-scheme/entity/NodeSeed";
+import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import { Logger } from "tslog";
-import { sendMessageSeed } from "../telegramHandler";
-import { convertArrayToJson, evaluateMessage } from "../messageHandler";
+import { isURL } from "validator";
+import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
 
 /**
  * This code is based on the original code of "EOSIO Protocol", published by Michael Yeates
- * Only the method validateAll() was implemented by Blacklusion
+ * Only the method validateSeed() was implemented by Blacklusion
  *
  *              https://github.com/michaeljyeates/eosio-protocol
  *
@@ -25,7 +31,7 @@ import { convertArrayToJson, evaluateMessage } from "../messageHandler";
  */
 
 /**
- * Logger Settings for Organization
+ * Logger Settings for Validation
  */
 const childLogger: Logger = logger.getChildLogger({
   name: "P2P-Validation",
@@ -34,6 +40,7 @@ const childLogger: Logger = logger.getChildLogger({
 const configLoggingLevel = config.get("general.logging_level");
 const debug = configLoggingLevel === "silly" || configLoggingLevel === "trace";
 
+// eslint-disable-next-line require-jsdoc
 class TestRunner {
   protected lastBlockTime: bigint;
   protected blockCount: number;
@@ -46,6 +53,7 @@ class TestRunner {
   protected p2p: EOSIOP2PClientConnection;
   protected numBlocks: number;
 
+  // eslint-disable-next-line require-jsdoc
   constructor(node: any, numBlocks: number) {
     this.node = node;
     this.lastBlockTime = BigInt(0);
@@ -61,11 +69,13 @@ class TestRunner {
     this.p2p = p2p;
   }
 
+  // eslint-disable-next-line require-jsdoc
   run(debug = false) {
     console.log(`Test runner doesnt override run`);
   }
 
-  protected async send_handshake(override) {
+  // eslint-disable-next-line require-jsdoc
+  protected async sendHandshake(override) {
     const msg = new HandshakeMessage();
     msg.copy({
       network_version: 1206,
@@ -93,46 +103,52 @@ class TestRunner {
   }
 }
 
+// eslint-disable-next-line require-jsdoc
 class BlockTransmissionTestRunner extends TestRunner {
   // @ts-ignore
-  private kill_timer: NodeJS.Timeout;
+  private killTimer: NodeJS.Timeout;
 
-  constructor(node: any, num_blocks: number) {
-    super(node, num_blocks);
+  // eslint-disable-next-line require-jsdoc
+  constructor(node: any, numBlocks: number) {
+    super(node, numBlocks);
   }
 
-  async on_signed_block(msg): Promise<void> {
+  // eslint-disable-next-line require-jsdoc
+  async onSignedBlock(msg): Promise<void> {
     // console.log('TestRunner:on_signed_block');
-    clearTimeout(this.kill_timer);
-    this.kill_timer = setTimeout(this.kill.bind(this), this.blockTimeout);
+    clearTimeout(this.killTimer);
+    this.killTimer = setTimeout(this.kill.bind(this), this.blockTimeout);
 
     this.blockCount++;
-    const block_num_hex = msg.previous.substr(0, 8); // first 64 bits
-    const block_num = parseInt(block_num_hex, 16) + 1;
+    // const blockNumHex = msg.previous.substr(0, 8); // first 64 bits
+    // const blockNum = parseInt(blockNumHex, 16) + 1;
     // @ts-ignore
     const tm = process.hrtime.bigint();
     if (this.lastBlockTime > 0) {
       const latency = Number(tm - this.lastBlockTime);
       this.latencies.push(latency);
-      // console.log(`Received block : ${block_num} signed by ${msg.producer} with latency ${latency} - ${this.block_count} received from ${this.node.host}`);
+      // console.log(`Received block : ${blockNum} signed by ${msg.producer} with latency ${latency} - ${this.block_count} received from ${this.node.host}`);
     }
     this.lastBlockTime = tm;
   }
 
-  async on_error(e): Promise<void> {
+  // eslint-disable-next-line require-jsdoc
+  async onError(e): Promise<void> {
     this.killed = true;
     this.killedReason = e.code;
     this.killedDetail = (e + "").replace("Error: ", "");
   }
 
-  log_results(results): void {
+  // eslint-disable-next-line require-jsdoc
+  logResults(results): void {
     console.log(JSON.stringify(results));
   }
 
+  // eslint-disable-next-line require-jsdoc
   async run(debug = false): Promise<any> {
-    this.kill_timer = setTimeout(this.kill.bind(this), this.blockTimeout);
+    this.killTimer = setTimeout(this.kill.bind(this), this.blockTimeout);
 
-    const num_blocks = this.numBlocks;
+    const numBlocks = this.numBlocks;
 
     const p2p = this.p2p;
 
@@ -145,12 +161,12 @@ class BlockTransmissionTestRunner extends TestRunner {
     try {
       const client: stream.Stream = await p2p.connect();
 
-      const deserialized_stream = client
+      const deserializedStream = client
         .pipe(new EOSIOStreamTokenizer({}))
         .pipe(new EOSIOStreamDeserializer({}))
         .on("data", (obj) => {
           if (obj[0] === 7) {
-            this.on_signed_block(obj[2]);
+            this.onSignedBlock(obj[2]);
           }
           if (obj[0] === 2) {
             this.killed = true;
@@ -161,60 +177,63 @@ class BlockTransmissionTestRunner extends TestRunner {
         });
 
       if (debug) {
-        deserialized_stream.pipe(new EOSIOStreamConsoleDebugger({ prefix: "<<<" }));
+        deserializedStream.pipe(new EOSIOStreamConsoleDebugger({ prefix: "<<<" }));
       }
 
       const res = await fetch(`${this.node.api}/v1/chain/get_info`);
       const info = await res.json();
 
-      const prev_info = await this.get_prev_info(info, num_blocks);
-      // const prev_info = info;
+      const prevInfo = await this.getPrevInfo(info, numBlocks);
+      // const prevInfo = info;
 
       const override = {
         chain_id: info.chain_id,
         p2p_address: "blacklusionPager - a6f45b4",
-        last_irreversible_block_num: prev_info.last_irreversible_block_num,
-        last_irreversible_block_id: prev_info.last_irreversible_block_id,
-        head_num: prev_info.head_block_num,
-        head_id: prev_info.head_block_id,
+        last_irreversible_block_num: prevInfo.last_irreversible_block_num,
+        last_irreversible_block_id: prevInfo.last_irreversible_block_id,
+        head_num: prevInfo.head_block_num,
+        head_id: prevInfo.head_block_id,
       };
-      await this.send_handshake(override);
+      await this.sendHandshake(override);
 
       // get num blocks before lib
       const msg = new SyncRequestMessage();
-      msg.start_block = prev_info.last_irreversible_block_num;
-      msg.end_block = prev_info.last_irreversible_block_num + num_blocks;
+      msg.start_block = prevInfo.last_irreversible_block_num;
+      msg.end_block = prevInfo.last_irreversible_block_num + numBlocks;
       await p2p.send_message(msg);
     } catch (e) {}
 
-    const results = await this.wait_for_tests(num_blocks);
+    const results = await this.waitForTests(numBlocks);
     p2p.disconnect();
 
     return results;
   }
 
-  async get_block_id(block_num_or_id: number | string): Promise<string> {
+  // eslint-disable-next-line require-jsdoc
+  async getBlockId(blockNumOrId: number | string): Promise<string> {
     const res = await fetch(`${this.node.api}/v1/chain/get_block`, {
       method: "POST",
-      body: JSON.stringify({ block_num_or_id }),
+      body: JSON.stringify({ block_num_or_id: blockNumOrId }),
     });
     const info = await res.json();
 
     return info.id;
   }
 
-  async get_prev_info(info: any, num = 1000) {
+  // eslint-disable-next-line require-jsdoc
+  async getPrevInfo(info: any, num = 1000) {
     if (num > 0) {
       info.head_block_num -= num;
       info.last_irreversible_block_num -= num;
-      info.head_block_id = await this.get_block_id(info.head_block_num);
-      info.last_irreversible_block_id = await this.get_block_id(info.last_irreversible_block_num);
+      info.head_block_id = await this.getBlockId(info.head_block_num);
+      info.last_irreversible_block_id = await this.getBlockId(info.last_irreversible_block_num);
     }
 
     return info;
   }
 
-  async get_result_json(): Promise<Object> {
+  // eslint-disable-next-line require-jsdoc
+  async getResultJson(): Promise<Object> {
     const raw = {
       status: "success",
       block_count: this.blockCount,
@@ -225,19 +244,19 @@ class BlockTransmissionTestRunner extends TestRunner {
 
     raw.status = !this.killedReason ? "success" : "error";
 
-    let avg = 0;
+    // let avg = 0;
     let sum = 0;
-    let sum_b = BigInt(0);
+    // let sumB = BigInt(0);
     if (raw.latencies.length > 0) {
       sum = raw.latencies.reduce((previous, current) => (current += previous));
-      sum_b = BigInt(sum_b);
-      avg = sum / raw.latencies.length;
+      // sumB = BigInt(sumB);
+      // avg = sum / raw.latencies.length;
     }
 
-    const ns_divisor = Math.pow(10, 9);
-    const total_time = sum / ns_divisor;
-    const blocks_per_ns = raw.block_count / sum;
-    let speed = (blocks_per_ns * ns_divisor).toFixed(10);
+    const nsDivisor = Math.pow(10, 9);
+    const totalTime = sum / nsDivisor;
+    const blocksPerNs = raw.block_count / sum;
+    let speed = (blocksPerNs * nsDivisor).toFixed(10);
     if (speed === "NaN") {
       speed = "";
     }
@@ -248,25 +267,27 @@ class BlockTransmissionTestRunner extends TestRunner {
       error_code: raw.error_code,
       error_detail: raw.error_detail,
       blocks_received: raw.block_count,
-      total_test_time: total_time,
+      total_test_time: totalTime,
       speed: speed,
     };
 
     return results;
   }
 
-  async wait_for_tests(num) {
+  // eslint-disable-next-line require-jsdoc
+  async waitForTests(num) {
     return new Promise(async (resolve, reject) => {
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         if (this.blockCount >= num) {
-          clearTimeout(this.kill_timer);
-          resolve(this.get_result_json());
+          clearTimeout(this.killTimer);
+          resolve(this.getResultJson());
           break;
         }
 
         if (this.killed) {
-          clearTimeout(this.kill_timer);
-          resolve(this.get_result_json());
+          clearTimeout(this.killTimer);
+          resolve(this.getResultJson());
           break;
         }
         await sleep(1000);
@@ -274,6 +295,7 @@ class BlockTransmissionTestRunner extends TestRunner {
     });
   }
 
+  // eslint-disable-next-line require-jsdoc
   kill(): void {
     this.killed = true;
     this.killedReason = "timeout";
@@ -284,58 +306,49 @@ class BlockTransmissionTestRunner extends TestRunner {
 /**
  *
  * @param {Guild} guild = guild for which the Seed is validated (must be tracked in database)
- * @param {Seed} lastValidation = last validation of the SAME P2P Endpoint
- * @param {Boolean} isMainnet = only either testnet or mainnet is validated. If set to true, Mainnet will be validated
- * @param {string} p2pEndpoint = url of the p2p endpoint
+ * @param {string} chainId = chainId of chain that is validated
+ * @param {string} endpointUrl = url of the p2p endpoint
  * @param {boolean} locationOk = states if the location information found in the bp.json is valid
  */
-export async function validateAll(
+export async function validateSeed(
   guild: Guild,
-  lastValidation: Seed,
-  isMainnet: boolean,
-  p2pEndpoint: string,
+  chainId: string,
+  endpointUrl: string,
   locationOk: boolean
-): Promise<[Seed, string]> {
-  if (!p2pEndpoint) return undefined;
+): Promise<NodeSeed> {
+  if (!endpointUrl) return undefined;
 
   // Set general variables
-  const api: string = isMainnet ? config.get("mainnet.api_endpoint") : config.get("testnet.api_endpoint");
-  let validationMessages: Array<[string, number]> = [];
+  const api: string = getChainsConfigItem(chainId, "api_endpoint");
 
   // Create seed object for database
-  const database = getConnection();
-  const seed: Seed = new Seed();
+  const database = getConnection(chainId);
+  const seed: NodeSeed = new NodeSeed();
   seed.guild = guild.name;
-  seed.validation_is_mainnet = isMainnet;
-  seed.location_ok = locationOk;
-  seed.p2p_endpoint = p2pEndpoint;
+  seed.endpoint_url = endpointUrl;
 
-  if (!lastValidation) lastValidation = new Seed();
-
+  if (getChainsConfigItem(chainId, "nodeSeed_location")) {
+    seed.location_ok = calculateValidationLevel(locationOk, chainId, "nodeSeed_location_level");
+  }
   /**
    * Test 1: Check url
    */
-  seed.p2p_endpoint_address_ok =
-    !new RegExp("^https?:\\/\\/").test(p2pEndpoint) && new RegExp(".+:[0-9]+").test(p2pEndpoint);
-  validationMessages.push(
-    evaluateMessage(
-      lastValidation.p2p_endpoint_address_ok,
-      seed.p2p_endpoint_address_ok,
-      "Provided P2P address",
-      "valid",
-      "invalid"
-    )
-  );
+  const endpointUrlOk = isURL(endpointUrl, {
+    protocols: [],
+    require_protocol: false,
+    require_port: true,
+  });
+  seed.endpoint_url_ok = calculateValidationLevel(endpointUrlOk, chainId, "nodeSeed_endpoint_url_ok_level");
 
-  if (!seed.p2p_endpoint_address_ok) return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
+  if (!seed.endpoint_url_ok) return seed;
 
   /**
    * 2. Create Seed Connection
    */
   const node = {
     api: api,
-    host: p2pEndpoint.substring(0, p2pEndpoint.indexOf(":")),
-    port: p2pEndpoint.substring(p2pEndpoint.indexOf(":") + 1, p2pEndpoint.length),
+    host: endpointUrl.substring(0, endpointUrl.indexOf(":")),
+    port: endpointUrl.substring(endpointUrl.indexOf(":") + 1, endpointUrl.length),
   };
   const runner: BlockTransmissionTestRunner = new BlockTransmissionTestRunner(
     node,
@@ -348,40 +361,40 @@ export async function validateAll(
        * Test 2.1: p2p Connection successful
        */
       if (result.status == "success") {
-        seed.p2p_connection_possible = true;
+        seed.p2p_connection_possible = calculateValidationLevel(
+          true,
+          chainId,
+          "nodeSeed_p2p_connection_possible_level"
+        );
 
         /**
          * Test 2.2: block transmission speed ok
          */
-        if (result.speed && result.speed > config.get("validation.p2p_ok_speed")) {
-          seed.block_transmission_speed_ok = true;
-          seed.block_transmission_speed_ms = Math.round(result.speed);
-        } else {
-          seed.block_transmission_speed_ok = false;
+        if (getChainsConfigItem(chainId, "nodeSeed_block_transmission_speed_ok")) {
+          if (result.speed && result.speed > config.get("validation.p2p_ok_speed")) {
+            seed.block_transmission_speed_ok = calculateValidationLevel(
+              true,
+              chainId,
+              "nodeSeed_block_transmission_speed_ok_level"
+            );
+            seed.block_transmission_speed_ms = Math.round(result.speed);
+          } else {
+            seed.block_transmission_speed_ok = calculateValidationLevel(
+              false,
+              chainId,
+              "nodeSeed_block_transmission_speed_ok_level"
+            );
+          }
         }
-
-        validationMessages.push(
-          evaluateMessage(
-            lastValidation.block_transmission_speed_ok,
-            seed.block_transmission_speed_ok,
-            "Block transmission speed is",
-            "OK",
-            "too slow"
-          )
-        );
       } else {
-        seed.p2p_connection_possible = false;
+        seed.p2p_connection_possible = calculateValidationLevel(
+          false,
+          chainId,
+          "nodeSeed_p2p_connection_possible_level"
+        );
       }
 
-      validationMessages.push(
-        evaluateMessage(
-          lastValidation.p2p_connection_possible,
-          seed.p2p_connection_possible,
-          "P2P connection was",
-          "possible",
-          "not possible" + (result.error_detail ? ": " + result.error_detail : "")
-        )
-      );
+      seed.p2p_connection_possible_message = result.error_detail ? result.error_detail : null;
     })
     .catch((error) => {
       // todo: improve error handling, test with block_count =  "10"
@@ -391,11 +404,13 @@ export async function validateAll(
   /**
    * All checks ok
    */
-  seed.all_checks_ok = seed.p2p_endpoint_address_ok && seed.p2p_connection_possible && seed.block_transmission_speed_ok;
-
-  validationMessages.push(
-    evaluateMessage(lastValidation.all_checks_ok, seed.all_checks_ok, "Seed Node is", "healthy", "not healthy")
-  );
+  const validations: [string, ValidationLevel][] = [
+    ["nodeSeed_location", seed.location_ok],
+    ["nodeSeed_endpoint_url_ok", seed.endpoint_url_ok],
+    ["nodeSeed_p2p_connection_possible", seed.p2p_connection_possible],
+    ["nodeSeed_block_transmission_speed_ok", seed.block_transmission_speed_ok],
+  ];
+  seed.all_checks_ok = allChecksOK(validations, chainId);
 
   /**
    * Store results in Database
@@ -406,17 +421,12 @@ export async function validateAll(
       "SAVED \t New Seed validation to database for " +
         guild.name +
         " " +
-        (isMainnet ? "mainnet" : "testnet") +
+        getChainsConfigItem(chainId, "name") +
         " to database"
     );
   } catch (error) {
     childLogger.fatal("Error while saving new Seed validation to database", error);
   }
 
-  /**
-   * Send Message to all subscribers of guild via. public telegram service
-   */
-  sendMessageSeed(guild.name, isMainnet, p2pEndpoint, validationMessages);
-
-  return [seed, convertArrayToJson(validationMessages, p2pEndpoint)];
+  return seed;
 }

@@ -1,0 +1,33 @@
+{
+  "nodeHyperion_ssl": {
+    "shouldSucceed": true
+  },
+  "nodeHyperion_health": {
+    "path": "/v2/health",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeHyperion_get_transaction": {
+    "path": "/v2/history/get_transaction?id=$nodeHyperion_transaction_id",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeHyperion_transaction_id"],
+    "shouldSucceed": true
+  },
+  "nodeHyperion_get_actions": {
+    "path": "/v2/history/get_actions?limit=1",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": null,
+    "shouldSucceed": true
+  },
+  "nodeHyperion_get_key_accounts": {
+    "path": "/v2/state/get_key_accounts",
+    "requestMethod": "POST",
+    "payload": "{ \"public_key\": \"$nodeHyperion_public_key\" }",
+    "variables": ["$nodeHyperion_public_key"],
+    "shouldSucceed": true
+  }
+}
