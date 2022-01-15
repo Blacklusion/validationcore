@@ -8,11 +8,9 @@ import * as config from "config";
 import * as stream from "stream";
 import fetch = require("node-fetch");
 import {
-  combineValidationLevel,
   calculateValidationLevel,
-  getChainsConfigItem,
   logger,
-  allChecksOK,
+  allChecksOK, validateBpLocation, extractLongitude, extractLatitude
 } from "../validationcore-database-scheme/common";
 import { getConnection } from "typeorm";
 import { NodeSeed } from "../validationcore-database-scheme/entity/NodeSeed";
@@ -20,6 +18,8 @@ import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import { Logger } from "tslog";
 import { isURL } from "validator";
 import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
+import { getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
+import { globalNodeSeedQueue } from "../index";
 
 /**
  * This code is based on the original code of "EOSIO Protocol", published by Michael Yeates
@@ -141,7 +141,7 @@ class BlockTransmissionTestRunner extends TestRunner {
 
   // eslint-disable-next-line require-jsdoc
   logResults(results): void {
-    console.log(JSON.stringify(results));
+    console.log("Results of SeedNode" + JSON.stringify(results));
   }
 
   // eslint-disable-next-line require-jsdoc
@@ -188,7 +188,7 @@ class BlockTransmissionTestRunner extends TestRunner {
 
       const override = {
         chain_id: info.chain_id,
-        p2p_address: "blacklusionPager - a6f45b4",
+        p2p_address: "validationcore.blacklusion.io:9876 - a6f45b4",
         last_irreversible_block_num: prevInfo.last_irreversible_block_num,
         last_irreversible_block_id: prevInfo.last_irreversible_block_id,
         head_num: prevInfo.head_block_num,
@@ -308,13 +308,13 @@ class BlockTransmissionTestRunner extends TestRunner {
  * @param {Guild} guild = guild for which the Seed is validated (must be tracked in database)
  * @param {string} chainId = chainId of chain that is validated
  * @param {string} endpointUrl = url of the p2p endpoint
- * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ * @param {unknown} location = location information as in bp.json
  */
 export async function validateSeed(
   guild: Guild,
   chainId: string,
   endpointUrl: string,
-  locationOk: boolean
+  location: unknown
 ): Promise<NodeSeed> {
   if (!endpointUrl) return undefined;
 
@@ -324,11 +324,14 @@ export async function validateSeed(
   // Create seed object for database
   const database = getConnection(chainId);
   const seed: NodeSeed = new NodeSeed();
+  seed.instance_id = config.get("general.instance_id")
   seed.guild = guild.name;
   seed.endpoint_url = endpointUrl;
 
   if (getChainsConfigItem(chainId, "nodeSeed_location")) {
-    seed.location_ok = calculateValidationLevel(locationOk, chainId, "nodeSeed_location_level");
+    seed.location_ok = calculateValidationLevel(validateBpLocation(location), chainId, "nodeSeed_location_level");
+    seed.location_longitude = extractLongitude(location);
+    seed.location_latitude = extractLatitude(location);
   }
   /**
    * Test 1: Check url
@@ -345,61 +348,65 @@ export async function validateSeed(
   /**
    * 2. Create Seed Connection
    */
-  const node = {
-    api: api,
-    host: endpointUrl.substring(0, endpointUrl.indexOf(":")),
-    port: endpointUrl.substring(endpointUrl.indexOf(":") + 1, endpointUrl.length),
-  };
-  const runner: BlockTransmissionTestRunner = new BlockTransmissionTestRunner(
-    node,
-    config.get("validation.p2p_block_count")
-  );
-  await runner
-    .run(debug)
-    .then((result) => {
-      /**
-       * Test 2.1: p2p Connection successful
-       */
-      if (result.status == "success") {
-        seed.p2p_connection_possible = calculateValidationLevel(
-          true,
-          chainId,
-          "nodeSeed_p2p_connection_possible_level"
-        );
-
+  try {
+    const node = {
+      api: api,
+      host: endpointUrl.substring(0, endpointUrl.indexOf(":")),
+      port: endpointUrl.substring(endpointUrl.indexOf(":") + 1, endpointUrl.length),
+    };
+    const runner: BlockTransmissionTestRunner = new BlockTransmissionTestRunner(
+      node,
+      config.get("validation.seed_block_count")
+    );
+    await globalNodeSeedQueue.add(() => runner
+      .run(debug)
+      .then((result) => {
         /**
-         * Test 2.2: block transmission speed ok
+         * Test 2.1: p2p Connection successful
          */
-        if (getChainsConfigItem(chainId, "nodeSeed_block_transmission_speed_ok")) {
-          if (result.speed && result.speed > config.get("validation.p2p_ok_speed")) {
-            seed.block_transmission_speed_ok = calculateValidationLevel(
-              true,
-              chainId,
-              "nodeSeed_block_transmission_speed_ok_level"
-            );
-            seed.block_transmission_speed_ms = Math.round(result.speed);
-          } else {
-            seed.block_transmission_speed_ok = calculateValidationLevel(
-              false,
-              chainId,
-              "nodeSeed_block_transmission_speed_ok_level"
-            );
-          }
-        }
-      } else {
-        seed.p2p_connection_possible = calculateValidationLevel(
-          false,
-          chainId,
-          "nodeSeed_p2p_connection_possible_level"
-        );
-      }
+        if (result.status == "success") {
+          seed.p2p_connection_possible = calculateValidationLevel(
+            true,
+            chainId,
+            "nodeSeed_p2p_connection_possible_level"
+          );
 
-      seed.p2p_connection_possible_message = result.error_detail ? result.error_detail : null;
-    })
-    .catch((error) => {
-      // todo: improve error handling, test with block_count =  "10"
-      console.log(error);
-    });
+          /**
+           * Test 2.2: block transmission speed ok
+           */
+          if (getChainsConfigItem(chainId, "nodeSeed_block_transmission_speed_ok")) {
+            if (result.speed && result.speed > config.get("validation.seed_ok_speed")) {
+              seed.block_transmission_speed_ok = calculateValidationLevel(
+                true,
+                chainId,
+                "nodeSeed_block_transmission_speed_ok_level"
+              );
+              seed.block_transmission_speed_ms = Math.round(result.speed);
+            } else {
+              seed.block_transmission_speed_ok = calculateValidationLevel(
+                false,
+                chainId,
+                "nodeSeed_block_transmission_speed_ok_level"
+              );
+            }
+          }
+        } else {
+          seed.p2p_connection_possible = calculateValidationLevel(
+            false,
+            chainId,
+            "nodeSeed_p2p_connection_possible_level"
+          );
+        }
+
+        seed.p2p_connection_possible_message = result.error_detail ? result.error_detail : null;
+      })
+      .catch((error) => {
+        // todo: improve error handling, test with block_count =  "10"
+        childLogger.warn("Error during NodeSeed validation", error);
+      }))
+  } catch (e) {
+    childLogger.warn("Error during NodeSeed validation", e);
+  }
 
   /**
    * All checks ok

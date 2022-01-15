@@ -1,8 +1,8 @@
 export enum ValidationLevel {
   NULL,
-  INFO,
-  WARN,
   ERROR,
+  WARN,
+  INFO,
   SUCCESS,
   SUCCESSALL,
 }

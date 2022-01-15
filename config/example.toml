@@ -10,7 +10,7 @@
 # ====================================================================================
 [general]
     # Internal use only. Will not be seen by potential telegram subscribers
-    name = 'wax-pager'
+    name = 'Validationcore'
 
     # Logger Settings: silly, trace, debug, info, warn, error, fatal (default = info)
     logging_level = "info"
@@ -26,35 +26,11 @@
     # Public Blacklusion Pager Telegram service (accessible for the user)
     # Leave blank if pager_mode is disabled
     public_url = 'urlhere'
+    public_token = 'tokenhere'
 
     # Private Telegram service (used for reporting errors to administrator)
     private_url = 'urlhere'
-
-# ====================================================================================
-#       CHAIN SETTINGS (will be replaced soon)
-# ====================================================================================
-[chains]
-    [mainnet]
-    name = 'wax'
-    chain_id = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
-    api_endpoint = 'urlhere'
-    server_versions = ["v2.0.5wax01", "v2.0.6wax02", "v2.0.7wax01", "v2.0.8wax01"]
-    history_test_transaction = 'f383a4de1236fb6bc34f6dda26c5c552deca19844f5d27238de52873828e51c6'
-    history_test_public_key = 'EOS77nEvHodDA2yWerxc4rw5WY6cY5j21WB7e76oZYjdRb6DMDN5d'
-    api_test_big_block = 7846307
-    api_test_big_block_transaction_count = 76
-    api_currency_symbol = "WAX"
-    api_test_account = "blacklusionx"
-
-    [testnet]
-    name = 'wax-testnet'
-    chain_id = 'f16b1833c747c43682f4386fca9cbb327929334a762755ebec17f6f23c9b8a12'
-    api_endpoint = 'urlhere'
-    server_versions = ["v2.0.5wax01", "v2.0.6wax02", "v2.0.7wax01", "v2.0.8wax01"]
-    history_test_transaction = '1eadbd3a4db9fab95b3c2ebc8646e48f4b6a50934f6d3565cf4aeee426d9ec56'
-    history_test_public_key = 'EOS5jjiP7AQvxV4vqHgSJLVdNxwtogYwhsvACLCA3XDwHWYzMtftY'
-    api_currency_symbol = "WAX"
-    api_test_account = "nation.wax"
+    private_token = 'tokenhere'
 
 # ====================================================================================
 #       VALIDATOR SETTINGS
@@ -63,14 +39,14 @@
     ## Specifies how often certain aspects of a guild will be validated
     # Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
     validation_round_interval = 600000
-    # Determines how often Seed Nodes should be validated (If set to 1, every round a validation will be performed, if set to 2 every second, if set to 3 every third...)
-    validation_seed_offset = 3
 
     ## Settings for the http requests
+    # x ms delay between requests to prevent hitting rate limitations
+    request_delay = 1000
     # If a request fails, it will be retried x times (this value may be overwritten by requests are suppose to fail)
     request_retry_count = 4
     # Pause between retry of failed requests
-    request_retry_pause_ms = 2500
+    request_retry_delay = 2500
     # Request will be canceled after x ms
     request_timeout_ms = 7000
 
@@ -80,12 +56,18 @@
     p2p_block_count = 10
     p2p_ok_speed = 2
     api_head_block_time_delta = 10000
-    # history_transaction_offset = 100
     history_actions_block_time_delta = 7200000
-    atomic_tolerated_missing_blocks = "??"
-    hyperion_query_time_ms = 400
+    atomic_tolerated_missing_blocks = 20
+    hyperion_tolerated_missing_blocks = 20
+    hyperion_query_time_ms = 2000
     # Valid social services in bp.json
     social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium", "hive"]
+
+    # Usually every failing request is retried after request_retry_pause_ms for request_retry_count times. If performance mode is enabled
+    # every request will only be executed once if performance_mode_threshold alreay requests have failed.
+    # For example: if set to two, there have to be 2 failing request for an Api, that every following Api request will only be tried once
+    performance_mode = true
+    performance_mode_threshold = 2
 
 # ====================================================================================
 #       DATABASE CONNECTION CONFIGURATION

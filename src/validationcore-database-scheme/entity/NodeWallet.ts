@@ -10,6 +10,9 @@ export class NodeWallet {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
+  @Column({ type: "smallint", nullable: false })
+  instance_id: number;
+
   @Column({ length: 12 })
   guild: string;
 
@@ -22,11 +25,19 @@ export class NodeWallet {
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   location_ok: ValidationLevel;
 
+  @Column({ type: "decimal", precision: 9, scale: 6, nullable: true })
+  location_longitude: number;
+
+  @Column({ type: "decimal", precision: 8, scale: 6,  nullable: true })
+  location_latitude: number;
+
   @Column({ nullable: false })
   endpoint_url: string;
 
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   endpoint_url_ok: ValidationLevel;
+
+
 
   @Column({ default: false })
   is_ssl: boolean;
@@ -37,25 +48,29 @@ export class NodeWallet {
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   ssl_errortype: HttpErrorType;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   accounts_ok: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   accounts_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   accounts_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   accounts_errortype: HttpErrorType;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   keys_ok: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   keys_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   keys_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })

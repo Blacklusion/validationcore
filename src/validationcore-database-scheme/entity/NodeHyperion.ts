@@ -10,6 +10,9 @@ export class NodeHyperion {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
+  @Column({ type: "smallint", nullable: false })
+  instance_id: number;
+
   @Column({ length: 12 })
   guild: string;
 
@@ -22,11 +25,19 @@ export class NodeHyperion {
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   location_ok: ValidationLevel;
 
+  @Column({ type: "decimal", precision: 9, scale: 6, nullable: true })
+  location_longitude: number;
+
+  @Column({ type: "decimal", precision: 8, scale: 6,  nullable: true })
+  location_latitude: number;
+
   @Column({ nullable: false })
   endpoint_url: string;
 
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   endpoint_url_ok: ValidationLevel;
+
+
 
   @Column({ default: false })
   is_ssl: boolean;
@@ -37,13 +48,15 @@ export class NodeHyperion {
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   ssl_errortype: HttpErrorType;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   health_found: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   health_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   health_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
@@ -52,13 +65,16 @@ export class NodeHyperion {
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   health_version_ok: ValidationLevel;
 
+  @Column({ nullable: true})
+  server_version: string;
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   health_host_ok: ValidationLevel;
 
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   health_query_time_ok: ValidationLevel;
 
-  @Column({type: "bigint", nullable: true })
+  @Column({ type: "bigint", nullable: true })
   health_query_time_ms: number;
 
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
@@ -112,39 +128,59 @@ export class NodeHyperion {
   @Column({ nullable: true })
   health_missing_blocks: number;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   get_transaction_ok: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_transaction_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_transaction_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   get_transaction_errortype: HttpErrorType;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   get_actions_ok: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_actions_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_actions_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   get_actions_errortype: HttpErrorType;
 
+
+
   @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
   get_key_accounts_ok: ValidationLevel;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_key_accounts_ms: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   get_key_accounts_httpcode: number;
 
   @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
   get_key_accounts_errortype: HttpErrorType;
+
+
+
+  @Column({ type: "enum", enum: ValidationLevel, default: ValidationLevel.NULL })
+  get_created_accounts_ok: ValidationLevel;
+
+  @Column({ type: "smallint", nullable: true })
+  get_created_accounts_ms: number;
+
+  @Column({ type: "smallint", nullable: true })
+  get_created_accounts_httpcode: number;
+
+  @Column({ type: "enum", enum: HttpErrorType, default: HttpErrorType.UNKNOWN })
+  get_created_accounts_errortype: HttpErrorType;
 }

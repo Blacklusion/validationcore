@@ -1,22 +1,22 @@
 import * as fetch from "node-fetch";
 import * as config from "config";
 import { HttpResponse } from "./HttpResponse";
-import { sleep } from "eosio-protocol";
 import { HttpErrorType } from "../validationcore-database-scheme/enum/HttpErrorType";
-import { getChainsConfigItem, logger, validationConfig } from "../validationcore-database-scheme/common";
+import { getChainsConfigItem, validationConfig } from "../validationcore-database-scheme/readConfig";
+import { logger, sleep } from "../validationcore-database-scheme/common";
 
 /**
  * GET Request
  * @param {string} base = base url of request without any additional path
  * @param {string} path = additional path of request, can be undefined
- * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {number} failedRequests = how many previous validations of the same node failed before
  */
 export async function get(
   base: string,
   path = "",
-  retryCounter: number = config.get("validation.request_retry_count")
+  failedRequests = 0,
 ): Promise<HttpResponse> {
-  return await httpRequest(base, path, retryCounter, true, undefined, undefined);
+  return await httpRequest(base, path, evaluatePerformanceMode(failedRequests, base), true, undefined, undefined);
 }
 
 /**
@@ -24,17 +24,17 @@ export async function get(
  * @param {string} base = base url of request without any additional path
  * @param {string} path = additional path of request, can be undefined
  * @param {json} payloadAsJson = payload as valid json
- * @param {number} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {number} failedRequests = how many previous validations of the same node failed before
  * @param {string} contentType = can be used to specify the contentType of Request. Defaults to json
  */
 export async function post(
   base: string,
   path = "",
   payloadAsJson: any = {},
-  retryCounter: number = config.get("validation.request_retry_count"),
+  failedRequests = 0,
   contentType = "application/json"
 ): Promise<HttpResponse> {
-  return await httpRequest(base, path, retryCounter, false, payloadAsJson, contentType);
+  return await httpRequest(base, path, evaluatePerformanceMode(failedRequests, base), false, payloadAsJson, contentType);
 }
 
 /**
@@ -42,13 +42,13 @@ export async function post(
  * @param {string} endpointUrl = url of the API endpoint
  * @param {string} validationKey = name of the test as specified in the config
  * @param {string} chainId = ChainId of the validation
- * @param {string} retryCounter = How often the request will be repeated if it fails. 0 means that the request wil be performed exactly once. Defaults to retryNumber specified in config
+ * @param {string} failedRequests = how many previous validations of the same node failed before
  */
 export async function request(
   endpointUrl: string,
   validationKey: string,
   chainId: string,
-  retryCounter: number = config.get("validation.request_retry_count")
+  failedRequests = 0
 ): Promise<HttpResponse> {
   let path = validationConfig[validationKey].path;
   let payload = validationConfig[validationKey].payload;
@@ -71,9 +71,9 @@ export async function request(
   }
 
   if (validationConfig[validationKey].requestMethod.toLowerCase() === "get") {
-    return await get(endpointUrl, path, retryCounter);
+    return await get(endpointUrl, path, failedRequests);
   } else if (validationConfig[validationKey].requestMethod.toLowerCase() === "post") {
-    return await post(endpointUrl, path, payload, retryCounter);
+    return await post(endpointUrl, path, payload, failedRequests);
   } else {
     logger.fatal("Invalid RequestMethod for " + validationKey + ". Check ./config/validation-config");
   }
@@ -82,24 +82,19 @@ export async function request(
 /**
  * Validates if a url has SSL configured properly
  * @param {string} url = Url that will be validated
+ * @param {boolean} responseOk = if the request this is called from was successful
+ * @param {HttpErrorType} errorType = the errorType of the request this was called from
  * @return {[boolean, string]} = the first argument is true if the check succeeded, the second contains the error message
  */
-export async function evaluateSSL(url: string): Promise<HttpResponse> {
+export async function evaluateSSL(url: string, responseOk: boolean, errorType: HttpErrorType): Promise<HttpResponse> {
   const sslResponse = new HttpResponse();
   if (!new RegExp("https://.+").test(url)) {
     sslResponse.ok = false;
     sslResponse.errorType = HttpErrorType.INVALIDURL;
     sslResponse.errorMessage = "no https url provided";
   } else {
-    await get(url, "", 0).then((response) => {
-      if (response.ok || (!response.ok && response.errorType === HttpErrorType.HTTP)) {
-        sslResponse.ok = true;
-      } else {
-        sslResponse.ok = false;
-        sslResponse.errorMessage = response.errorMessage;
-        sslResponse.errorType = response.errorType;
-      }
-    });
+    sslResponse.errorType = errorType;
+    sslResponse.ok = responseOk || (!responseOk && errorType === HttpErrorType.HTTP);
   }
 
   return sslResponse;
@@ -151,6 +146,9 @@ async function httpRequest(
     return response;
   }
 
+  // Sleep before requests ensures that there will always be a delay between multiple requests
+  await sleep(config.get("validation.request_delay"));
+
   // Send Request
   if (isGetRequest) {
     const startTime = Date.now();
@@ -193,7 +191,7 @@ async function httpRequest(
     logger.silly(urlWithPath + " => Retrying request (" + retryCounter + ")");
 
     // Sleep in order to avoid potential problems with rate limits
-    await sleep(config.get("validation.request_retry_pause_ms"));
+    await sleep(config.get("validation.request_retry_delay"));
 
     // Try again
     return httpRequest(base, path, --retryCounter, isGetRequest, payloadAsJson, contentType);
@@ -226,17 +224,19 @@ function timeout(promise: Promise<any>): Promise<Response> {
 
 /**
  * Checks if the performance mode threshold is reached as specified in config/local.toml
+ * If performance mode kicks in, requests won't be retried, hence reducing executing time and preventing hitting rate limits
  * @param {number} failedRequests = Number of prior failed requests
+ * @param {string} base = request urlBase, only used for better logging
  * @return {number} = returns 0 if performance mode kicks in
  */
-export function evaluatePerformanceMode(failedRequests: number): number {
+function evaluatePerformanceMode(failedRequests: number, base: string): number {
   if (
     config.get("validation.performance_mode") &&
-    Math.max(0, config.get("validation.performance_mode_threshold")) <= failedRequests
+    failedRequests >= Math.max(0, config.get("validation.performance_mode_threshold"))
   ) {
-    logger.silly("Performance mode kicked in");
+    logger.silly("Performance mode kicked in, " + base);
     return 0;
   } else {
-    return undefined;
+    return config.get("validation.request_retry_count");
   }
 }

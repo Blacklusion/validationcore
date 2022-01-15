@@ -1,5 +1,6 @@
 import { HttpErrorType } from "../validationcore-database-scheme/enum/HttpErrorType";
 import { logger } from "../validationcore-database-scheme/common";
+import * as config from "config";
 
 /**
  * Response returned by the http methods in HttpRequest
@@ -40,6 +41,7 @@ export class HttpResponse {
     this._elapsedTimeInMilliseconds = -1;
     this.ok = false;
     this.errorMessage = "";
+    this._errorType = HttpErrorType.UNKNOWN;
   }
 
   /**
@@ -61,7 +63,13 @@ export class HttpResponse {
 
     // Calculate ElapsedTime
     if (startTime !== undefined) {
-      this._elapsedTimeInMilliseconds = Date.now() - startTime;
+      const elapsedTimeInMilliseconds = Date.now() - startTime;
+
+      // Prevent to big int numbers in database
+      if (elapsedTimeInMilliseconds > (config.get("validation.request_timeout_ms") + 200)) {
+        logger.warn("Request took longer than expected (" + elapsedTimeInMilliseconds + "ms). This is longer than the timeout (" + config.get("validation.request_timeout_ms") + "ms)")
+      }
+      this._elapsedTimeInMilliseconds = Math.min(elapsedTimeInMilliseconds, config.get("validation.request_timeout_ms"));
     }
 
     // Parse body to json if possible
@@ -91,7 +99,7 @@ export class HttpResponse {
       this._errorType = HttpErrorType.TIMEOUT;
     }
 
-    // Error is Timeout Error
+    // Error is DNS Error
     else if (error.code && error.code === "ENOTFOUND") {
       this.errorMessage = "Domain not found";
       this._errorType = HttpErrorType.DNS;
@@ -108,10 +116,10 @@ export class HttpResponse {
     }
 
     // The differentiation between other errors is not really necessary
-    else if (error.code !== undefined) {
+    else if (error.code !== undefined || error.type !== undefined) {
       this.errorMessage = error.code;
       // EPROTO Error will fall in this category
-      if (error.code !== "ECONNREFUSED" && error.code !== "EPROTO" && error.code !== "ECONNRESET") {
+      if (error.code !== "ECONNREFUSED" && error.code !== "EPROTO" && error.code !== "ECONNRESET" && error.type !== "max-redirect") {
         logger.warn(
           "An undefined error occured: " + error.code + ". Consider adding additional handling for this errorType."
         );
@@ -155,10 +163,10 @@ export class HttpResponse {
   }
 
   /**
-   * Return null instead of ErrorType.NULL, since ErrorType.NULL is the default set in the constructor
+   * Getter errorType
    */
   get errorType(): HttpErrorType {
-    return this._errorType === HttpErrorType.UNKNOWN ? null : this._errorType;
+    return this._errorType;
   }
 
   /**

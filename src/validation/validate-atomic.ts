@@ -1,9 +1,8 @@
 import * as config from "config";
 import {
   allChecksOK,
-  calculateValidationLevel,
-  getChainsConfigItem,
-  logger,
+  calculateValidationLevel, extractLatitude, extractLongitude,
+  logger, validateBpLocation
 } from "../validationcore-database-scheme/common";
 import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import { getConnection } from "typeorm";
@@ -12,6 +11,7 @@ import * as http from "../httpConnection/HttpRequest";
 import { NodeAtomic } from "../validationcore-database-scheme/entity/NodeAtomic";
 import { isURL } from "validator";
 import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
+import { getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
 
 /**
  * Logger Settings for NodeAtomic NodeApi
@@ -28,14 +28,14 @@ const childLogger: Logger = logger.getChildLogger({
  * @param {string} chainId = chainId of chain that is validated
  * @param {string} endpointUrl = url of the api node (http and https possible)
  * @param {boolean} isSSL = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
- * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ * @param {unknown} location = location information as in bp.json
  */
 export async function validateAtomic(
   guild: Guild,
   chainId: string,
   endpointUrl: string,
   isSSL: boolean,
-  locationOk: boolean
+  location: unknown
 ): Promise<NodeAtomic> {
   if (!endpointUrl) return undefined;
 
@@ -45,11 +45,17 @@ export async function validateAtomic(
   // Create atomic object for database
   const database = getConnection(chainId);
   const atomic: NodeAtomic = new NodeAtomic();
+  atomic.instance_id = config.get("general.instance_id")
   atomic.guild = guild.name;
   atomic.endpoint_url = endpointUrl;
+  atomic.is_ssl = isSSL;
 
-  if (getChainsConfigItem(chainId, "nodeAtomic_location"))
-    atomic.location_ok = calculateValidationLevel(locationOk, chainId, "nodeAtomic_location_level");
+
+  if (getChainsConfigItem(chainId, "nodeAtomic_location")) {
+    atomic.location_ok = calculateValidationLevel(validateBpLocation(location), chainId, "nodeAtomic_location_level");
+    atomic.location_longitude = extractLongitude(location);
+    atomic.location_latitude = extractLatitude(location);
+  }
 
   // Check if valid EndpointUrl has been provided
   if (getChainsConfigItem(chainId, "nodeAtomic_endpoint_url_ok")) {
@@ -59,25 +65,26 @@ export async function validateAtomic(
     atomic.endpoint_url_ok = calculateValidationLevel(endpointUrlOk, chainId, "nodeAtomic_endpoint_url_ok_level");
   }
 
-  /**
-   * SSL Check
-   */
-  atomic.is_ssl = isSSL;
-  if (isSSL && getChainsConfigItem(chainId, "nodeAtomic_ssl")) {
-    http.evaluateSSL(endpointUrl).then((response) => {
-      atomic.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_ssl_level");
-      atomic.ssl_errortype = response.errorType;
-      if (atomic.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
-    });
-  }
 
   /**
    * Test 1 Health Checks
    */
   if (getChainsConfigItem(chainId, "nodeAtomic_health")) {
     await http
-      .request(endpointUrl, "nodeAtomic_health", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeAtomic_health", chainId, failedRequestCounter)
       .then((response) => {
+
+        /**
+         * SSL Check
+         */
+        if (isSSL && getChainsConfigItem(chainId, "nodeAtomic_ssl")) {
+          http.evaluateSSL(endpointUrl, response.ok, response.errorType).then((response) => {
+            atomic.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_ssl_level");
+            atomic.ssl_errortype = response.errorType;
+            if (atomic.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+          });
+        }
+
         const healthFound = response.ok && response.isJson();
         atomic.health_ms = response.elapsedTimeInMilliseconds;
         atomic.health_found = calculateValidationLevel(healthFound, chainId, "nodeAtomic_health_level");
@@ -89,14 +96,26 @@ export async function validateAtomic(
           return;
         }
 
-        // Test 1.1 Health version
-        /*
-      In the current implementation there is no check for the version, since the atomic NodeApi is still very young
-      atomic.health_version_ok = response.getDataItem(["version"]) !== undefined;
-       */
+        /**
+         * Test 1.1 Access Control Allow Header Checks
+         */
+        if (getChainsConfigItem(chainId, "nodeAtomic_health_access_control_header")) {
+          const atomicAccessControlHeaderOk =
+            response.headers !== undefined &&
+            response.headers.has("access-control-allow-headers");
+
+          atomic.health_access_control_header_ok = calculateValidationLevel(
+            atomicAccessControlHeaderOk,
+            chainId,
+            "nodeAtomic_health_access_control_header_level"
+          );
+        }
+
+        // Test 1.2 Health version
+      atomic.server_version = response.getDataItem(["data", "version"]);
 
         /**
-         * Test 1.1 Status of Services
+         * Test 1.3 Status of Services
          */
         // Status of Postgres Service
         if (getChainsConfigItem(chainId, "nodeAtomic_health_postgres")) {
@@ -121,7 +140,7 @@ export async function validateAtomic(
         }
 
         /**
-         * Test 1.2 Check headblock of reader
+         * Test 1.4 Check head block of reader
          */
         if (getChainsConfigItem(chainId, "nodeAtomic_health_total_indexed_blocks")) {
           const missingBlocks =
@@ -139,33 +158,11 @@ export async function validateAtomic(
   }
 
   /**
-   * Test 2 Alive Checks
-   */
-  if (getChainsConfigItem(chainId, "nodeAtomic_alive")) {
-    await http
-      .request(endpointUrl, "nodeAtomic_alive", chainId, http.evaluatePerformanceMode(failedRequestCounter))
-      .then((response) => {
-        atomic.alive_ms = response.elapsedTimeInMilliseconds;
-        atomic.alive_httpcode = response.httpCode;
-        atomic.alive_errortype = response.errorType;
-
-        if (response.ok && response.data === "success") {
-          atomic.alive_ok = calculateValidationLevel(true, chainId, "nodeAtomic_alive_level");
-        } else {
-          atomic.alive_ok = calculateValidationLevel(false, chainId, "nodeAtomic_alive_level");
-          // todo: check if response.data is possible
-          atomic.alive_message = response.data;
-          failedRequestCounter++;
-        }
-      });
-  }
-
-  /**
    * Test 2 Get Asset by ID
    */
   if (getChainsConfigItem(chainId, "nodeAtomic_assets")) {
     await http
-      .request(endpointUrl, "nodeAtomic_assets", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeAtomic_assets", chainId, failedRequestCounter)
       .then((response) => {
         atomic.assets_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_assets_level");
         atomic.assets_ms = response.elapsedTimeInMilliseconds;
@@ -181,7 +178,7 @@ export async function validateAtomic(
    */
   if (getChainsConfigItem(chainId, "nodeAtomic_collections")) {
     await http
-      .request(endpointUrl, "nodeAtomic_collections", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeAtomic_collections", chainId, failedRequestCounter)
       .then((response) => {
         atomic.collections_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_collections_level");
         atomic.collections_ms = response.elapsedTimeInMilliseconds;
@@ -197,7 +194,7 @@ export async function validateAtomic(
    */
   if (getChainsConfigItem(chainId, "nodeAtomic_schemas")) {
     await http
-      .request(endpointUrl, "nodeAtomic_schemas", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeAtomic_schemas", chainId, failedRequestCounter)
       .then((response) => {
         atomic.schemas_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_schemas_level");
         atomic.schemas_ms = response.elapsedTimeInMilliseconds;
@@ -209,20 +206,37 @@ export async function validateAtomic(
   }
 
   /**
+   * Test 5 Get Template by name
+   */
+  if (getChainsConfigItem(chainId, "nodeAtomic_templates")) {
+    await http
+      .request(endpointUrl, "nodeAtomic_templates", chainId, failedRequestCounter)
+      .then((response) => {
+        atomic.templates_ok = calculateValidationLevel(response.ok, chainId, "nodeAtomic_templates_level");
+        atomic.templates_ms = response.elapsedTimeInMilliseconds;
+        atomic.templates_errortype = response.errorType;
+        atomic.templates_httpcode = response.httpCode;
+
+        if (atomic.templates_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+      });
+  }
+
+  /**
    * Set all checks ok
    */
   const validations: [string, ValidationLevel][] = [
     ["nodeAtomic_location", atomic.location_ok],
     ["nodeAtomic_endpoint_url_ok", atomic.endpoint_url_ok],
     ["nodeAtomic_health", atomic.health_found],
+    ["nodeAtomic_health_access_control_header", atomic.health_access_control_header_ok],
     ["nodeAtomic_health_postgres", atomic.health_postgres_ok],
     ["nodeAtomic_health_redis", atomic.health_redis_ok],
     ["nodeAtomic_health_chain", atomic.health_chain_ok],
     ["nodeAtomic_health_total_indexed_blocks", atomic.health_total_indexed_blocks_ok],
-    ["nodeAtomic_alive", atomic.alive_ok],
     ["nodeAtomic_assets", atomic.assets_ok],
     ["nodeAtomic_collections", atomic.collections_ok],
     ["nodeAtomic_schemas", atomic.schemas_ok],
+    ["nodeAtomic_templates", atomic.templates_ok],
   ];
 
   if (isSSL) validations.push(["nodeAtomic_ssl", atomic.ssl_ok]);
