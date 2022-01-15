@@ -1,79 +1,91 @@
-#####################################          __      __  _____  ____  ___
-#                                   #         /  \    /  \/  _  \ \   \/  /
-#     Blacklusion Pager Config      #         \   \/\/   /  /_\  \ \     /
-#       Happy monitoring :)         #          \        /    |    \/     \
-#                                   #           \__/\  /\____|__  /___/\  \
-#####################################                \/         \/      \_/
+#        ____  __           __   __           _
+#       / __ )/ /___ ______/ /__/ /_  _______(_)___  ____
+#      / __  / / __ `/ ___/ //_/ / / / / ___/ / __ \/ __ \
+#     / /_/ / / /_/ / /__/ ,< / / /_/ (__  ) / /_/ / / / /
+#    /_____/_/\__,_/\___/_/|_/_/\__,_/____/_/\____/_/ /_/
 
 # ====================================================================================
 #       General PROGRAM SETTINGS
 # ====================================================================================
 [general]
-    # Internal use only. Will not be seen by potential telegram subscribers
-    name = 'Validationcore'
+# Internal use only. Will not be seen by potential telegram subscribers
+name = 'Validationcore'
 
-    # Logger Settings: silly, trace, debug, info, warn, error, fatal (default = info)
-    logging_level = "info"
+# Logger Settings: silly, trace, debug, info, warn, error, fatal (default = info)
+logging_level = "info"
 
-    # If set to false the validationCore will not try to contact the public telegram service (default: true)
-    # Useful for analytic purposes without telegram notifications
-    pager_mode = true
+# If set to false the validationCore will not try to contact the public telegram service (default: true)
+# Useful for analytic purposes without telegram notifications
+pager_mode = false
+
+# Master/Slave settings. A master will send a request to the slaves on the first run to timecode the executions
+is_master = false
+slaves = ["127.0.0.1"]
+slaves_port = 1234
+slaves_authentication_token = "tokenhere"
+# Must be unique between all master and slaves. Stored to database with every validation to track which instance is responsible for a certain validation
+instance_id = 1
 
 # ====================================================================================
 #       TELEGRAM SETTINGS
 # ====================================================================================
 [telegram]
-    # Public Blacklusion Pager Telegram service (accessible for the user)
-    # Leave blank if pager_mode is disabled
-    public_url = 'urlhere'
-    public_token = 'tokenhere'
+# Public Blacklusion Pager Telegram service (accessible for the user)
+# Leave blank if pager_mode is disabled
+public_url = 'urlhere'
+public_token = 'tokenhere'
 
-    # Private Telegram service (used for reporting errors to administrator)
-    private_url = 'urlhere'
-    private_token = 'tokenhere'
+# Private Telegram service (used for reporting errors to administrator)
+private_url = 'urlhere'
+private_token = 'tokenhere'
 
 # ====================================================================================
 #       VALIDATOR SETTINGS
 # ====================================================================================
 [validation]
-    ## Specifies how often certain aspects of a guild will be validated
-    # Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
-    validation_round_interval = 600000
+## Specifies how often certain aspects of a guild will be validated
+# Interval between start of validationrounds (validationround = validation of all guilds). Note: It will not be waited until one round finishes before starting the next one
+validation_round_interval = 3600000
+# Used to timecode the slaves. Between starting every slave validation_round_slave_delta will be waited
+# validation_round_interval / (NumberOfSlaves + 1) = validation_round_slave_delta
+validation_round_slave_delta = 900000
 
-    ## Settings for the http requests
-    # x ms delay between requests to prevent hitting rate limitations
-    request_delay = 1000
-    # If a request fails, it will be retried x times (this value may be overwritten by requests are suppose to fail)
-    request_retry_count = 4
-    # Pause between retry of failed requests
-    request_retry_delay = 2500
-    # Request will be canceled after x ms
-    request_timeout_ms = 7000
+## Settings for the http requests
+# x ms delay between requests to prevent hitting rate limitations
+request_delay = 20000
+# If a request fails, it will be retried x times (this value may be overwritten by requests are suppose to fail)
+request_retry_count = 2
+# Pause between retry of failed requests
+request_retry_delay = 10000
+# Request will be canceled after x ms
+request_timeout_ms = 7000
 
-    ## Validation Settings specific to certain features (e.g seed or history)
-    # Offset of getProducers request => max. x producers will be tracked in validationcore-database-scheme
-    producer_limit = 500
-    p2p_block_count = 10
-    p2p_ok_speed = 2
-    api_head_block_time_delta = 10000
-    history_actions_block_time_delta = 7200000
-    atomic_tolerated_missing_blocks = 20
-    hyperion_tolerated_missing_blocks = 20
-    hyperion_query_time_ms = 2000
-    # Valid social services in bp.json
-    social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium", "hive"]
+## Validation Settings specific to certain features (e.g seed or history)
+# Offset of getProducers request => max. x producers will be tracked in validationcore-database-scheme
+producer_limit = 500
+seed_block_count = 20
+seed_ok_speed = 2
+seed_concurrent_validations = 1
+api_head_block_time_delta = 10000
+history_transaction_offset = 100
+history_actions_block_time_delta = 7200000
+hyperion_tolerated_missing_blocks = 40
+hyperion_query_time_ms = 2000
+atomic_tolerated_missing_blocks = 40
+# Valid social services in bp.json
+social_services = ["facebook", "github", "keybase", "reddit", "steemit", "telegram", "twitter", "wechat", "youtube", "medium", "hive"]
 
-    # Usually every failing request is retried after request_retry_pause_ms for request_retry_count times. If performance mode is enabled
-    # every request will only be executed once if performance_mode_threshold alreay requests have failed.
-    # For example: if set to two, there have to be 2 failing request for an Api, that every following Api request will only be tried once
-    performance_mode = true
-    performance_mode_threshold = 2
+# Usually every failing request is retried after request_retry_pause_ms for request_retry_count times. If performance mode is enabled
+# every request will only be executed once if performance_mode_threshold alreay requests have failed.
+# For example: if set to two, there have to be 2 failing request for an Api, that every following Api request will only be tried once
+performance_mode = true
+performance_mode_threshold = 1
 
 # ====================================================================================
 #       DATABASE CONNECTION CONFIGURATION
 # ====================================================================================
 [database]
-    postgres_host = "localhost"
-    postgres_port = 5432
-    postgres_user = 'uniqueNameHere'
-    postgres_password = 'uniquePasswordHere'
+postgres_host = "127.0.0.1"
+postgres_port = 5432
+postgres_user = 'user'
+postgres_password = 'password'
