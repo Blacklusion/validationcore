@@ -12,15 +12,15 @@ export class Guild {
   @CreateDateColumn()
   tracked_since: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: "smallint", nullable: true })
   location: number;
+
+  @Column({ nullable: true })
+  locationAlpha: string;
 
   @Column({ nullable: true })
   url: string;
 
   @Column({ nullable: true })
   url_logo_256: string;
-
-  @Column({ nullable: true })
-  last_validation_id: string;
 }

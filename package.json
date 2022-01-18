@@ -1,8 +1,11 @@
 {
   "name": "validationcore",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "The validationcore validates the endpoints of an eosio blockchain on a frequent basis and can either be used to send messages to a list of telegram subscribers with the additional pager-telegram-service or it can be used in standalone mode e.g. for providing an insight api.",
   "license": "MPL-2.0",
+  "repository": {
+    "url": "https://github.com/Blacklusion/validationcore"
+  },
   "devDependencies": {
     "@types/node": "^8.0.29",
     "@typescript-eslint/eslint-plugin": "^4.1.0",
@@ -16,11 +19,14 @@
   },
   "dependencies": {
     "@types/jquery": "^3.5.1",
+    "body-parser": "^1.19.0",
     "config": "^3.3.1",
     "csv-load-sync": "^2.3.1",
     "eosio-protocol": "Blacklusion/eosio-protocol#with-dist",
     "eosjs": "^21.0.3",
+    "express": "^4.17.1",
     "node-fetch": "^2.6.1",
+    "p-queue": "6.6.2",
     "pg": "^8.3.3",
     "reflect-metadata": "^0.1.10",
     "stream": "^0.0.2",

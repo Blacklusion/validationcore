@@ -22,5 +22,12 @@
     "payload": "{ \"json\": true, \"public_key\": \"$nodeHistory_public_key\" }",
     "variables": ["$nodeHistory_public_key"],
     "shouldSucceed": true
+  },
+  "nodeHistory_get_controlled_accounts": {
+    "path": "/v1/history/get_controlled_accounts",
+    "requestMethod": "POST",
+    "payload": "{ \"json\": true, \"controlling_account\": \"$nodeHistory_controlling_account\" }",
+    "variables": ["$nodeHistory_controlling_account"],
+    "shouldSucceed": true
   }
 }

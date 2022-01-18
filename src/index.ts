@@ -1,8 +1,12 @@
 import * as config from "config";
-import { chainsConfig, getChainsConfigItem, logger, readConfig } from "./validationcore-database-scheme/common";
 import { createConnections } from "typeorm";
 import { validateAllChains } from "./validation/validate-chain";
+import { logger } from "./validationcore-database-scheme/common";
+import { chainsConfig, getChainsConfigItem, readConfig } from "./validationcore-database-scheme/readConfig";
+import PQueue from "p-queue";
+import { sendStartSignalToSlaves, startSlaveServer } from "./masterSlaveConnection";
 
+export let globalNodeSeedQueue: PQueue;
 /**
  * STARTUP:
  *  - Connection to database
@@ -10,11 +14,12 @@ import { validateAllChains } from "./validation/validate-chain";
  */
 function main() {
   console.log(
-    " _    __      ___     __      __  _                                          ___ \n" +
-      "| |  / /___ _/ (_)___/ /___ _/ /_(_)___  ____  _________  ________     _   _|__ \\\n" +
-      "| | / / __ `/ / / __  / __ `/ __/ / __ \\/ __ \\/ ___/ __ \\/ ___/ _ \\   | | / /_/ /\n" +
-      "| |/ / /_/ / / / /_/ / /_/ / /_/ / /_/ / / / / /__/ /_/ / /  /  __/   | |/ / __/ \n" +
-      "|___/\\__,_/_/_/\\__,_/\\__,_/\\__/_/\\____/_/ /_/\\___/\\____/_/   \\___/    |___/____/"
+    " _    __      ___     __      __  _                                          _____\n" +
+    "| |  / /___ _/ (_)___/ /___ _/ /_(_)___  ____  _________  ________     _   _|__  /\n" +
+    "| | / / __ `/ / / __  / __ `/ __/ / __ \\/ __ \\/ ___/ __ \\/ ___/ _ \\   | | / //_ < \n" +
+    "| |/ / /_/ / / / /_/ / /_/ / /_/ / /_/ / / / / /__/ /_/ / /  /  __/   | |/ /__/ / \n" +
+    "|___/\\__,_/_/_/\\__,_/\\__,_/\\__/_/\\____/_/ /_/\\___/\\____/_/   \\___/    |___/____/  \n" +
+    "                                                                                  "
   );
   console.log("    by Blacklusion - 2021\n\n");
 
@@ -28,11 +33,13 @@ function main() {
     return;
   }
 
+  // Initialize global SeedNode Queue. Used to limit concurrent validations of SeedNodes
+  globalNodeSeedQueue = new PQueue({concurrency: config.get("validation.seed_concurrent_validations")})
+
   // Create a separate connection for every chain
   const connections = [];
   for (const chainId in chainsConfig) {
-    // todo: check await
-    if (typeof chainId === "string") {
+    if (chainId && typeof chainId === "string") {
       connections.push({
         name: chainId,
         type: "postgres",
@@ -59,8 +66,15 @@ function main() {
       /**
        * Initialize interval based validations
        */
-      validateAllChains();
-      setInterval(validateAllChains, config.get("validation.validation_round_interval"));
+      if (config.get("general.is_master")) {
+        logger.info("[ Mode ] = Master");
+        validateAllChains();
+        sendStartSignalToSlaves();
+        setInterval(validateAllChains, config.get("validation.validation_round_interval"));
+      } else {
+        logger.info("[ Mode ] = Slave");
+        startSlaveServer();
+      }
     })
     .catch((error) => {
       logger.error("Error while connecting to database ", error);

@@ -48,11 +48,15 @@
       "name": "wax 2.0.9",
       "valid": true
     },
-    "v2.1.0wax01": {
-      "name": "wax 2.1.0",
+    "v2.0.9wax02": {
+      "name": "wax 2.0.9",
       "valid": true
     },
     "v2.0.10wax01": {
+      "name": "wax 2.0.10",
+      "valid": true
+    },
+    "v2.0.10wax02": {
       "name": "wax 2.0.10",
       "valid": true
     },
@@ -60,7 +64,15 @@
       "name": "wax 2.0.11",
       "valid": true
     },
+    "v2.0.11wax02": {
+      "name": "wax 2.0.11",
+      "valid": true
+    },
     "v2.0.12wax01": {
+      "name": "wax 2.0.12",
+      "valid": true
+    },
+    "v2.0.12wax02": {
       "name": "wax 2.0.12",
       "valid": true
     },
@@ -68,8 +80,48 @@
       "name": "wax 2.0.13",
       "valid": true
     },
+    "v2.0.13wax02": {
+      "name": "wax 2.0.13",
+      "valid": true
+    },
     "v2.0.14wax01": {
       "name": "wax 2.0.14",
+      "valid": true
+    },
+    "v2.0.14wax02": {
+      "name": "wax 2.0.14",
+      "valid": true
+    },
+    "v2.0.15wax01": {
+      "name": "wax 2.0.15",
+      "valid": true
+    },
+    "v2.0.15wax02": {
+      "name": "wax 2.0.15",
+      "valid": true
+    },
+    "v2.1.0wax01": {
+      "name": "wax 2.1.0",
+      "valid": true
+    },
+    "v2.1.0wax02": {
+      "name": "wax 2.1.0",
+      "valid": true
+    },
+    "v2.1.1wax01": {
+      "name": "wax 2.1.1",
+      "valid": true
+    },
+    "v2.1.1wax02": {
+      "name": "wax 2.1.1",
+      "valid": true
+    },
+    "v2.1.2wax01": {
+      "name": "wax 2.1.2",
+      "valid": true
+    },
+    "v2.1.2wax02": {
+      "name": "wax 2.1.2",
       "valid": true
     }
   }

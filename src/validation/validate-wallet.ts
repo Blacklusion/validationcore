@@ -1,9 +1,7 @@
 import {
-  combineValidationLevel,
   calculateValidationLevel,
-  getChainsConfigItem,
   logger,
-  allChecksOK,
+  allChecksOK, validateBpLocation, extractLongitude, extractLatitude
 } from "../validationcore-database-scheme/common";
 import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import { getConnection } from "typeorm";
@@ -12,6 +10,9 @@ import * as http from "../httpConnection/HttpRequest";
 import { isURL } from "validator";
 import { NodeWallet } from "../validationcore-database-scheme/entity/NodeWallet";
 import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
+import * as config from "config";
+import { getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
+
 
 /**
  * Logger Settings for NodeApi
@@ -28,14 +29,14 @@ const childLogger: Logger = logger.getChildLogger({
  * @param {string} chainId = chainId of chain that is validated
  * @param {string} endpointUrl = url of the api node (http and https possible)
  * @param {boolean} isSSL = if true, it is also validated if TLS is working. Then the NodeWallet will only be considered healthy, if all checks pass and if TLS is working
- * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ * @param {unknown} location = location information as in bp.json
  */
 export async function validateWallet(
   guild: Guild,
   chainId: string,
   endpointUrl: string,
   isSSL: boolean,
-  locationOk: boolean
+  location: unknown
 ): Promise<NodeWallet> {
   if (!endpointUrl) return undefined;
 
@@ -45,11 +46,17 @@ export async function validateWallet(
   // Create wallet object for database
   const database = getConnection(chainId);
   const wallet: NodeWallet = new NodeWallet();
+  wallet.instance_id = config.get("general.instance_id")
   wallet.guild = guild.name;
   wallet.endpoint_url = endpointUrl;
+  wallet.is_ssl = isSSL;
 
-  if (getChainsConfigItem(chainId, "nodeWallet_location"))
-    wallet.location_ok = calculateValidationLevel(locationOk, chainId, "nodeWallet_location_level");
+
+  if (getChainsConfigItem(chainId, "nodeWallet_location")) {
+    wallet.location_ok = calculateValidationLevel(validateBpLocation(location), chainId, "nodeWallet_location_level");
+    wallet.location_longitude = extractLongitude(location);
+    wallet.location_latitude = extractLatitude(location);
+  }
 
   // Check if valid EndpointUrl has been provided
   if (getChainsConfigItem(chainId, "nodeWallet_endpoint_url_ok")) {
@@ -60,25 +67,26 @@ export async function validateWallet(
     wallet.endpoint_url_ok = calculateValidationLevel(endpointUrlOk, chainId, "nodeWallet_endpoint_url_ok_level");
   }
 
-  /**
-   * SSL Check
-   */
-  wallet.is_ssl = isSSL;
-  if (isSSL && getChainsConfigItem(chainId, "nodeWallet_ssl")) {
-    http.evaluateSSL(endpointUrl).then((response) => {
-      wallet.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeWallet_ssl_level");
-      wallet.ssl_errortype = response.errorType;
-      if (wallet.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
-    });
-  }
 
   /**
    * Test 1: Wallet - get_accounts_by_authorizers
    */
   if (getChainsConfigItem(chainId, "nodeWallet_accounts")) {
     await http
-      .request(endpointUrl, "nodeWallet_accounts", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeWallet_accounts", chainId, failedRequestCounter)
       .then((response) => {
+
+        /**
+         * SSL Check
+         */
+        if (isSSL && getChainsConfigItem(chainId, "nodeWallet_ssl")) {
+          http.evaluateSSL(endpointUrl, response.ok, response.errorType).then((response) => {
+            wallet.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeWallet_ssl_level");
+            wallet.ssl_errortype = response.errorType;
+            if (wallet.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+          });
+        }
+
         const accountsOk = response.ok && response.isJson();
         wallet.accounts_ok = calculateValidationLevel(accountsOk, chainId, "nodeWallet_accounts_level");
         wallet.accounts_ms = response.elapsedTimeInMilliseconds;
@@ -94,7 +102,7 @@ export async function validateWallet(
    */
   if (getChainsConfigItem(chainId, "nodeWallet_keys")) {
     await http
-      .request(endpointUrl, "nodeWallet_keys", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeWallet_keys", chainId, failedRequestCounter)
       .then((response) => {
         const keysOk = response.ok && response.isJson();
         wallet.keys_ok = calculateValidationLevel(keysOk, chainId, "nodeWallet_keys_level");

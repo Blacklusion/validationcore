@@ -29,5 +29,12 @@
     "payload": "{ \"public_key\": \"$nodeHyperion_public_key\" }",
     "variables": ["$nodeHyperion_public_key"],
     "shouldSucceed": true
+  },
+  "nodeHyperion_get_created_accounts": {
+    "path": "/v2/history/get_created_accounts?account=$nodeHyperion_creator_account",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeHyperion_creator_account"],
+    "shouldSucceed": true
   }
 }

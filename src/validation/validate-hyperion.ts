@@ -2,8 +2,7 @@ import {
   allChecksOK,
   combineValidationLevel,
   calculateValidationLevel,
-  getChainsConfigItem,
-  logger,
+  logger, validateBpLocation, extractLongitude, extractLatitude
 } from "../validationcore-database-scheme/common";
 import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import * as config from "config";
@@ -13,6 +12,7 @@ import * as http from "../httpConnection/HttpRequest";
 import { NodeHyperion } from "../validationcore-database-scheme/entity/NodeHyperion";
 import { isURL } from "validator";
 import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
+import { getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
 
 /**
  * Logger Settings for NodeHyperion
@@ -27,14 +27,14 @@ const childLogger: Logger = logger.getChildLogger({
  * @param {string} chainId = chainId of chain that is validated
  * @param {string} endpointUrl = url of the api node (http and https possible)
  * @param {boolean} isSSL = if true, it is also validated if TLS is working. Then the NodeApi will only be considered healthy, if all checks pass and if TLS is working
- * @param {boolean} locationOk = states if the location information found in the bp.json is valid
+ * @param {unknown} location = location information as in bp.json
  */
 export async function validateHyperion(
   guild: Guild,
   chainId: string,
   endpointUrl: string,
   isSSL: boolean,
-  locationOk: boolean
+  location: unknown
 ): Promise<NodeHyperion> {
   if (!endpointUrl) return undefined;
 
@@ -44,11 +44,17 @@ export async function validateHyperion(
   // Create hyperion object for database
   const database = getConnection(chainId);
   const hyperion: NodeHyperion = new NodeHyperion();
+  hyperion.instance_id = config.get("general.instance_id")
   hyperion.guild = guild.name;
   hyperion.endpoint_url = endpointUrl;
+  hyperion.is_ssl = isSSL;
 
-  if (getChainsConfigItem(chainId, "nodeHyperion_location"))
-    hyperion.location_ok = calculateValidationLevel(locationOk, chainId, "nodeHyperion_location_level");
+
+  if (getChainsConfigItem(chainId, "nodeHyperion_location")) {
+    hyperion.location_ok = calculateValidationLevel(validateBpLocation(location), chainId, "nodeHyperion_location_level");
+    hyperion.location_longitude = extractLongitude(location);
+    hyperion.location_latitude = extractLatitude(location);
+  }
 
   // Check if valid EndpointUrl has been provided
   if (getChainsConfigItem(chainId, "nodeHyperion_endpoint_url_ok")) {
@@ -59,24 +65,24 @@ export async function validateHyperion(
   }
 
   /**
-   * SSL Check
-   */
-  hyperion.is_ssl = isSSL;
-  if (isSSL && getChainsConfigItem(chainId, "nodeHyperion_ssl")) {
-    http.evaluateSSL(endpointUrl).then((response) => {
-      hyperion.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeHyperion_ssl_level");
-      hyperion.ssl_errortype = response.errorType;
-      if (hyperion.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
-    });
-  }
-
-  /**
    * Test 1 Hyperion Health
    */
   if (getChainsConfigItem(chainId, "nodeHyperion_health")) {
     await http
-      .request(endpointUrl, "nodeHyperion_health", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeHyperion_health", chainId, failedRequestCounter)
       .then((response) => {
+
+        /**
+         * SSL Check
+         */
+        if (isSSL && getChainsConfigItem(chainId, "nodeHyperion_ssl")) {
+          http.evaluateSSL(endpointUrl, response.ok, response.errorType).then((response) => {
+            hyperion.ssl_ok = calculateValidationLevel(response.ok, chainId, "nodeHyperion_ssl_level");
+            hyperion.ssl_errortype = response.errorType;
+            if (hyperion.ssl_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+          });
+        }
+
         const healthFound = response.ok && response.isJson();
         hyperion.health_found = calculateValidationLevel(healthFound, chainId, "nodeHyperion_health_level");
         hyperion.health_ms = response.elapsedTimeInMilliseconds;
@@ -97,6 +103,7 @@ export async function validateHyperion(
             chainId,
             "nodeHyperion_health_version_level"
           );
+          hyperion.server_version = response.getDataItem(["version"])
         }
 
         // Test 1.2 Health Host
@@ -349,7 +356,7 @@ export async function validateHyperion(
    */
   if (getChainsConfigItem(chainId, "nodeHyperion_get_transaction")) {
     await http
-      .request(endpointUrl, "nodeHyperion_get_transaction", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeHyperion_get_transaction", chainId, failedRequestCounter)
       .then((response) => {
         hyperion.get_transaction_ok = calculateValidationLevel(
           response.ok,
@@ -369,7 +376,7 @@ export async function validateHyperion(
    */
   if (getChainsConfigItem(chainId, "nodeHyperion_get_actions")) {
     await http
-      .request(endpointUrl, "nodeHyperion_get_actions", chainId, http.evaluatePerformanceMode(failedRequestCounter))
+      .request(endpointUrl, "nodeHyperion_get_actions", chainId, failedRequestCounter)
       .then((response) => {
         hyperion.get_actions_ms = response.elapsedTimeInMilliseconds;
         hyperion.get_actions_errortype = response.errorType;
@@ -396,6 +403,8 @@ export async function validateHyperion(
           if (Math.abs(timeDelta) < 300000) {
             hyperion.get_actions_ok = calculateValidationLevel(true, chainId, "nodeHyperion_get_actions_level");
           }
+        } else {
+          hyperion.get_actions_ok = calculateValidationLevel(false, chainId, "nodeHyperion_get_actions_level");
         }
         if (hyperion.get_actions_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
       });
@@ -410,7 +419,7 @@ export async function validateHyperion(
         endpointUrl,
         "nodeHyperion_get_key_accounts",
         chainId,
-        http.evaluatePerformanceMode(failedRequestCounter)
+        failedRequestCounter
       )
       .then((response) => {
         hyperion.get_key_accounts_ms = response.elapsedTimeInMilliseconds;
@@ -425,6 +434,44 @@ export async function validateHyperion(
         hyperion.get_key_accounts_httpcode = response.httpCode;
 
         if (hyperion.get_key_accounts_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
+      });
+  }
+
+  /**
+   * Test 5 get_created_accounts
+   */
+  if (getChainsConfigItem(chainId, "nodeHyperion_get_created_accounts")) {
+    await http
+      .request(
+        endpointUrl,
+        "nodeHyperion_get_created_accounts",
+        chainId,
+        failedRequestCounter
+      )
+      .then((response) => {
+        let getCreatedAccountsOk =
+          response.ok && response.isJson() &&  Array.isArray(response.getDataItem(["accounts"]));
+
+        if (getCreatedAccountsOk) {
+          const arrayFromConfig = getChainsConfigItem(chainId, "$nodeHyperion_created_accounts").split(",");
+          getCreatedAccountsOk = getCreatedAccountsOk && response.getDataItem(["accounts"]).length === arrayFromConfig.length;
+
+          response.getDataItem(["accounts"]).forEach(x => {
+            getCreatedAccountsOk = getCreatedAccountsOk && x && x.name && arrayFromConfig.includes(x.name);
+          })
+        }
+
+        hyperion.get_created_accounts_ok = calculateValidationLevel(
+          getCreatedAccountsOk,
+          chainId,
+          "nodeHyperion_get_created_accounts_level"
+        );
+
+        hyperion.get_created_accounts_ms = response.elapsedTimeInMilliseconds;
+        hyperion.get_created_accounts_errortype = response.errorType;
+        hyperion.get_created_accounts_httpcode = response.httpCode;
+
+        if (hyperion.get_created_accounts_ok !== ValidationLevel.SUCCESS) failedRequestCounter++;
       });
   }
 
@@ -446,6 +493,7 @@ export async function validateHyperion(
     ["nodeHyperion_get_transaction", hyperion.get_transaction_ok],
     ["nodeHyperion_get_actions", hyperion.get_actions_ok],
     ["nodeHyperion_get_key_accounts", hyperion.get_key_accounts_ok],
+    ["nodeHyperion_get_created_accounts", hyperion.get_created_accounts_ok],
   ];
 
   if (isSSL) validations.push(["nodeHyperion_ssl", hyperion.ssl_ok]);

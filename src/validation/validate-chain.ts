@@ -1,11 +1,12 @@
 import { getConnection } from "typeorm";
-import { chainsConfig, getChainsConfigItem, logger } from "../validationcore-database-scheme/common";
 import { Guild } from "../validationcore-database-scheme/entity/Guild";
 import { validateGuild } from "./validate-guild";
 import { JsonRpc } from "eosjs";
-import { Logger } from "tslog";
 import * as config from "config";
 import * as fetch from "node-fetch";
+import { countryCodes } from "../../config/countryCodes";
+import { logger } from "../validationcore-database-scheme/common";
+import { chainsConfig, getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
 
 // Increases before every validation round and is only used for better logging outputs
 // Useful if validation rounds take longer than validation interval
@@ -23,8 +24,10 @@ export async function validateAllChains() {
   logger.info("STARTING NEW VALIDATION ROUND (" + validationRoundCounterLocal + ")");
 
   for (const chainId in chainsConfig) {
-    // todo: check await
-    if (typeof chainId === "string") await validateChain(chainId, validationRoundCounterLocal);
+    if (typeof chainId === "string") {
+      // no await to prevent interference between multiple chains
+      validateChain(chainId, validationRoundCounterLocal);
+    }
   }
 }
 
@@ -34,13 +37,6 @@ export async function validateAllChains() {
  * @param {number} validationRoundCounterLocal = counter used for log outputs
  */
 async function validateChain(chainId: string, validationRoundCounterLocal: number) {
-  // todo: test code
-  const childLogger: Logger = logger.getChildLogger({
-    name: getChainsConfigItem(chainId, "name"),
-    displayFilePath: "hidden",
-    displayLoggerName: true,
-  });
-
   const database = getConnection(chainId);
 
   // Update GuildTable
@@ -60,14 +56,16 @@ async function validateChain(chainId: string, validationRoundCounterLocal: numbe
       promise.then(() => {
         guildsArray = guildsArray.filter((x) => x !== guild.name);
         resolvedGuildCounter++;
-        childLogger.info(
-          "ROUND " +
+        logger.info(
+          getChainsConfigItem(chainId, "name") +
+          (getChainsConfigItem(chainId, "name").length <= 8 ? "\t" : "") +
+          "\t- ROUND " +
             validationRoundCounterLocal +
             " - [" +
             resolvedGuildCounter +
             "/" +
             guilds.length +
-            "] Finished evaluating guild " +
+            "] Finished validating guild " +
             guild.name +
             (guildsArray.length <= 5 ? ", missing guilds: " + guildsArray : "")
         );
@@ -77,11 +75,15 @@ async function validateChain(chainId: string, validationRoundCounterLocal: numbe
 
   // Create Log output when all validations are finished
   await Promise.all(validationPromises)
-    .then((x) => {
-      childLogger.info("VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
+    .then(() => {
+      logger.info(getChainsConfigItem(chainId, "name") +
+        (getChainsConfigItem(chainId, "name").length <= 8 ? "\t" : "") +
+        "\t- VALIDATION ROUND COMPLETE! (" + validationRoundCounterLocal + ")");
     })
     .catch((e) => {
-      childLogger.error("ERROR DURING VALIDATION ROUND (" + validationRoundCounterLocal + ")", e);
+      logger.error(getChainsConfigItem(chainId, "name") +
+        (getChainsConfigItem(chainId, "name").length <= 8 ? "\t" : "") +
+        "\t- ERROR DURING VALIDATION ROUND (" + validationRoundCounterLocal + ")", e);
     });
 
   return Promise.resolve(true);
@@ -119,6 +121,7 @@ async function updateGuildTable(chainId: string) {
           guild.name = producer.owner;
           guild.url = producer.url;
           guild.location = producer.location;
+          guild.locationAlpha = translateLocationNumberToAlpha(producer.location);
 
           // Get guild from database if it is already tracked
           const guildFromDatabase = await database.manager.findOne(Guild, guild.name);
@@ -136,7 +139,7 @@ async function updateGuildTable(chainId: string) {
             logger.info(
               "Added " +
                 guild.name +
-                "on " +
+                " on " +
                 getChainsConfigItem(chainId, "name") +
                 " to database. This guild will now be monitored."
             );
@@ -147,5 +150,21 @@ async function updateGuildTable(chainId: string) {
     }
   } catch (error) {
     logger.fatal("Error while updating guildTable", error);
+  }
+}
+
+/**
+ * Converts a locationNumber provided on-chain e.g. 276 to a string e.g. "DE"
+ * Uses the config/countryCodes.ts
+ * @param {number} location = Numeric ISO Code
+ * @return {string | null} = Alpha-2 ISO Code or Null if no matching code can be found to the number
+ */
+export function translateLocationNumberToAlpha(location: number): string | null {
+  const country = countryCodes["" + location];
+
+  if (country && country["alpha2"]) {
+    return country["alpha2"].toUpperCase();
+  } else {
+    return null;
   }
 }

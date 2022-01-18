@@ -8,8 +8,7 @@ import * as config from "config";
 import {
   allChecksOK,
   calculateValidationLevel,
-  getChainsConfigItem,
-  logger
+  logger, validateBpLocation
 } from "../validationcore-database-scheme/common";
 import { Validation } from "../validationcore-database-scheme/entity/Validation";
 import "reflect-metadata";
@@ -25,6 +24,7 @@ import { NodeAtomic } from "../validationcore-database-scheme/entity/NodeAtomic"
 import { isEmail, isURL } from "validator";
 import { NodeWallet } from "../validationcore-database-scheme/entity/NodeWallet";
 import { ValidationLevel } from "../validationcore-database-scheme/enum/ValidationLevel";
+import { getChainsConfigItem } from "../validationcore-database-scheme/readConfig";
 
 /**
  * Logger Settings for Validation
@@ -40,6 +40,9 @@ const childLogger: Logger = logger.getChildLogger({
  * @param {string} chainId = chainId of chain that is validated
  */
 export async function validateGuild(guild: Guild, chainId: string): Promise<boolean> {
+
+  childLogger.debug("START \t New validation validation for " + guild.name + " " + getChainsConfigItem(chainId, "name"))
+
   // Set general variables
   const url: string = guild.url;
   let pathToBpJson: string;
@@ -47,17 +50,8 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
   // Create validation object for database
   const database = getConnection(chainId);
   const validation: Validation = new Validation();
+  validation.instance_id = config.get("general.instance_id");
   validation.guild = guild.name;
-
-  // Get last validation of guild - Needed for validationOffset of Nodes
-  // todo: improve
-  const lastValidation: Validation = await database.manager.findOne(Validation, {
-    where: [
-      {
-        id: guild.last_validation_id,
-      },
-    ],
-  });
 
   /**
    * ====================================================================================
@@ -218,8 +212,8 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
        * Test 3.3: website
        */
       if (getChainsConfigItem(chainId, "guild_bpjson_website")) {
-        await http.get(response.getDataItem(["org", "website"])).then((response) => {
           validation.bpjson_website_url = response.getDataItem(["org", "website"]);
+        await http.get(response.getDataItem(["org", "website"])).then((response) => {
           validation.bpjson_website_ok = calculateValidationLevel(response.ok, chainId, "guild_bpjson_website_level");
           validation.bpjson_website_ms = response.elapsedTimeInMilliseconds;
           validation.bpjson_website_errortype = response.errorType;
@@ -231,8 +225,8 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
        * Test 3.4: Code of conduct
        */
       if (getChainsConfigItem(chainId, "guild_bpjson_code_of_conduct")) {
+        validation.bpjson_code_of_conduct_url = response.getDataItem(["org", "code_of_conduct"]);
         await http.get(response.getDataItem(["org", "code_of_conduct"])).then((response) => {
-          validation.bpjson_code_of_conduct_url = response.getDataItem(["org", "code_of_conduct"]);
           validation.bpjson_code_of_conduct_ok = calculateValidationLevel(
             response.ok,
             chainId,
@@ -248,8 +242,8 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
        * Test 3.5: Ownership Disclosure
        */
       if (getChainsConfigItem(chainId, "guild_bpjson_ownership_disclosure")) {
+        validation.bpjson_ownership_disclosure_url = response.getDataItem(["org", "ownership_disclosure"]);
         await http.get(response.getDataItem(["org", "ownership_disclosure"])).then((response) => {
-          validation.bpjson_ownership_disclosure_url = response.getDataItem(["org", "ownership_disclosure"]);
           validation.bpjson_ownership_disclosure_ok = calculateValidationLevel(
             response.ok,
             chainId,
@@ -268,7 +262,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
         // Valid email field in bp.json
         if (response.getDataItem(["org", "email"]) !== undefined) {
           // Check if email if formatted correctly
-          const emailOk = isEmail(response.getDataItem(["org", "email"]));
+          const emailOk = !Array.isArray(response.getDataItem(["org", "email"])) && isEmail(response.getDataItem(["org", "email"]));
           validation.bpjson_email_ok = calculateValidationLevel(emailOk, chainId, "guild_bpjson_email_level");
 
           if (validation.bpjson_email_ok !== ValidationLevel.SUCCESS)
@@ -291,7 +285,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
 
           // More than one GitHub user supplied
           if (Array.isArray(gitHubUserObj)) {
-            let gitHubUserIncorrectMessage = "was provided but has invalid formatting (";
+            let gitHubUserIncorrectMessage = "Was provided but has invalid formatting (";
             validation.bpjson_github_user_ok = calculateValidationLevel(true, chainId, "guild_bpjson_github_level");
 
             // Check array length
@@ -335,10 +329,10 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
 
             if (!validation.bpjson_github_user_ok)
               validation.bpjson_github_user_message =
-                "was provided, but has invalid formatting (" + gitHubUserObj + ")";
+                "Was provided, but has invalid formatting (" + gitHubUserObj + ")";
           }
         } else {
-          validation.bpjson_github_user_message = "was not provided";
+          validation.bpjson_github_user_message = "Was not provided";
           validation.bpjson_github_user_ok = calculateValidationLevel(false, chainId, "guild_bpjson_github_level");
         }
       }
@@ -347,7 +341,6 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
        * Test 3. : Chain resources
        */
       if (getChainsConfigItem(chainId, "guild_bpjson_chain_resources")) {
-        let chainResourcesIncorrectMessage = "";
         if (response.getDataItem(["org", "chain_resources"]) !== undefined) {
           if (Array.isArray(response.getDataItem(["org", "chain_resources"]))) {
             validation.bpjson_chain_resources_message = "Arrays are not allowed";
@@ -520,6 +513,13 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
           chainId,
           "guild_bpjson_location_level"
         );
+
+        // Add Location from BP.json to Guild database to ensure proper Location if chain uses location producer-schedule
+        if (bpjsonLocationOk && typeof response.getDataItem(["org", "location", "country"]) === "string") {
+          await database.manager.update(Guild, guild.name, {
+            locationAlpha: response.getDataItem(["org", "location", "country"]).toUpperCase()
+          });
+        }
       }
 
       /**
@@ -562,7 +562,6 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
       if (response.getDataItem(["nodes"]) !== undefined && Object.keys(response.getDataItem(["nodes"])).length >= 1) {
         for (const node of response.getDataItem(["nodes"])) {
           if (node["node_type"]) {
-            const locationOk: boolean = validateBpLocation(node.location);
             /**
              * Test 3.11: Check if producer is listed
              */
@@ -572,7 +571,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
             ) {
               if (!validation.nodes_producer_found)
                 validation.nodes_producer_found = calculateValidationLevel(
-                  locationOk,
+                  validateBpLocation(node.location),
                   chainId,
                   "guild_nodeProducer_found_level"
                 );
@@ -584,28 +583,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
               /**
                * Test 3.12: Test Seed Nodes
                */
-              // Get last validation from database with same endpoint url
-              let lastSeedValidation: NodeSeed;
-              if (lastValidation && lastValidation.nodes_seed) {
-                lastSeedValidation = lastValidation.nodes_seed.find((seed) => {
-                  return seed.endpoint_url === node.p2p_endpoint;
-                });
-              }
-
-              // Validate Seed Endpoint
-              let seedNode: NodeSeed;
-              if (
-                !lastSeedValidation ||
-                (lastSeedValidation &&
-                  lastSeedValidation.validation_date.valueOf() <=
-                    Date.now() -
-                      (config.get("validation.validation_seed_offset") - 0.5) *
-                        config.get("validation.validation_round_interval"))
-              ) {
-                seedNode = await seed.validateSeed(guild, chainId, node.p2p_endpoint, locationOk);
-              } else {
-                seedNode = lastSeedValidation;
-              }
+              const seedNode: NodeSeed = await seed.validateSeed(guild, chainId, node.p2p_endpoint, node.location);
 
               // Add seed validation to validation object, if it is not undefined (e.g. undefined if no url was provided)
               if (seedNode) {
@@ -625,7 +603,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                  * Test 3.13: Test Api Nodes
                  */
                 // Validate API
-                const nodeApi: NodeApi = await api.validateApi(guild, chainId, node.api_endpoint, false, locationOk);
+                const nodeApi: NodeApi = await api.validateApi(guild, chainId, node.api_endpoint, false, node.location);
                 if (nodeApi) {
                   if (!validation.nodes_api) {
                     validation.nodes_api = [];
@@ -634,7 +612,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                 }
 
                 // Validate API SSL
-                const nodeApiSSL: NodeApi = await api.validateApi(guild, chainId, node.ssl_endpoint, true, locationOk);
+                const nodeApiSSL: NodeApi = await api.validateApi(guild, chainId, node.ssl_endpoint, true, node.location);
                 if (nodeApiSSL) {
                   if (!validation.nodes_api) {
                     validation.nodes_api = [];
@@ -653,7 +631,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.api_endpoint,
                   false,
-                  locationOk
+                    node.location
                 );
                 if (nodeWallet) {
                   if (!validation.nodes_wallet) {
@@ -668,7 +646,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.ssl_endpoint,
                   true,
-                  locationOk
+                  node.location
                 );
                 if (nodeWalletSSL) {
                   if (!validation.nodes_wallet) {
@@ -686,7 +664,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.api_endpoint,
                   false,
-                  locationOk
+                  node.location
                 );
                 if (nodeHistory) {
                   if (!validation.nodes_history) {
@@ -701,7 +679,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.ssl_endpoint,
                   true,
-                  locationOk
+                  node.location
                 );
                 if (nodeHistorySSL) {
                   if (!validation.nodes_history) {
@@ -718,7 +696,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.api_endpoint,
                   false,
-                  locationOk
+                  node.location
                 );
                 if (nodeHyperion) {
                   if (!validation.nodes_hyperion) {
@@ -733,7 +711,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.ssl_endpoint,
                   true,
-                  locationOk
+                  node.location
                 );
                 if (nodeHyperionSSL) {
                   if (!validation.nodes_hyperion) {
@@ -751,7 +729,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.api_endpoint,
                   false,
-                  locationOk
+                  node.location
                 );
                 if (nodeAtomic) {
                   if (!validation.nodes_atomic) {
@@ -766,7 +744,7 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
                   chainId,
                   node.ssl_endpoint,
                   true,
-                  locationOk
+                  node.location
                 );
                 if (nodeAtomicSSL) {
                   if (!validation.nodes_atomic) {
@@ -821,52 +799,6 @@ export async function validateGuild(guild: Guild, chainId: string): Promise<bool
     "SAVED \t New validation validation for " + guild.name + " " + getChainsConfigItem(chainId, "name") + " to database"
   );
 
-  // Update last validation field in guild table
-  await database.manager.update(Guild, guild.name, {
-    last_validation_id: validation.id,
-  });
-
   // It must be returned a dummy promise, so the parent function calling this function waits until all validations are completed
   return Promise.resolve(true);
-}
-
-/**
- * Verifies a location field used by the bp.json schema
- * Do NOT use for location verification of on chain producer information
- * @param {object} location = json formatted object in the following schema: "name", "country", "latitude", "longitude"
- * @return {boolean} = is true if all location checks have passed
- */
-function validateBpLocation(location: any): boolean {
-  let successfulLocationTests = 0;
-
-  // Name
-  if (RegExp(".+").test(location["name"])) {
-    successfulLocationTests++;
-  } else {
-    childLogger.debug("FALSE \t Invalid location name");
-  }
-  // Country: Should be two digit upper case country code
-  if (RegExp("[A-Z]{2}").test(location["country"]) && location["country"].length == 2) {
-    successfulLocationTests++;
-  } else {
-    childLogger.debug("FALSE \t Invalid Country code. Should be two digit country code and upper case.");
-  }
-  // Latitude: should be between -90 and 90
-  if (Math.abs(Number.parseFloat(location["latitude"])) <= 90) {
-    successfulLocationTests++;
-  } else {
-    childLogger.debug("FALSE \t Invalid location latitude out of range");
-  }
-  // Longitude: should be between -180 and 180
-  if (Math.abs(Number.parseFloat(location["longitude"])) <= 180) {
-    successfulLocationTests++;
-  } else {
-    childLogger.debug("FALSE \t Invalid location longitude");
-  }
-  if (Number.parseFloat(location["longitude"]) == 0 && Number.parseFloat(location["latitude"]) == 0) {
-    childLogger.debug("FALSE \t Your location would be in the atlantic ocean ;-)");
-    return false;
-  }
-
-  return successfulLocationTests == 4;
 }

@@ -36,5 +36,12 @@
     "payload": null,
     "variables": ["$nodeAtomic_schema"],
     "shouldSucceed": true
+  },
+  "nodeAtomic_templates": {
+    "path": "/atomicassets/v1/templates/$nodeAtomic_template",
+    "requestMethod": "GET",
+    "payload": null,
+    "variables": ["$nodeAtomic_template"],
+    "shouldSucceed": true
   }
 }
