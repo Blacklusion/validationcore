@@ -1,0 +1,49 @@
+{
+  "name": "validationcore",
+  "version": "3.0.0",
+  "description": "The validationcore validates the endpoints of an eosio blockchain on a frequent basis and can either be used to send messages to a list of telegram subscribers with the additional pager-telegram-service or it can be used in standalone mode e.g. for providing an insight api.",
+  "license": "MPL-2.0",
+  "repository": {
+    "url": "https://github.com/Blacklusion/validationcore"
+  },
+  "devDependencies": {
+    "@types/node": "^8.0.29",
+    "@typescript-eslint/eslint-plugin": "^4.1.0",
+    "@typescript-eslint/parser": "^4.1.0",
+    "eslint": "^7.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-config-prettier": "^6.11.0",
+    "prettier": "2.1.1",
+    "ts-node": "3.3.0",
+    "typescript": "3.3.3333"
+  },
+  "dependencies": {
+    "@types/jquery": "^3.5.1",
+    "body-parser": "^1.19.0",
+    "config": "^3.3.1",
+    "csv-load-sync": "^2.3.1",
+    "eosio-protocol": "Blacklusion/eosio-protocol#with-dist",
+    "eosjs": "^21.0.3",
+    "express": "^4.17.1",
+    "node-fetch": "^2.6.1",
+    "p-queue": "6.6.2",
+    "pg": "^8.3.3",
+    "reflect-metadata": "^0.1.10",
+    "stream": "^0.0.2",
+    "toml": "^3.0.0",
+    "tslog": "^2.8.0",
+    "typeorm": "0.2.25",
+    "validator": "^13.6.0"
+  },
+  "keywords": [
+    "blacklusion pager",
+    "wax blockchain",
+    "blacklusion"
+  ],
+  "main": "src/index.ts",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .ts --fix",
+    "start": "ts-node src/index.ts"
+  }
+}
