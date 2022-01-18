@@ -14,7 +14,3 @@ In a set interval (10min by default), a validation will be performed. The valida
 ## Pager mode
 
 Pager mode requires an additional telegram microservice. The validationcore will format the messages and connect to the telegram-service. The telegram-service will handle distribution of the messages and handle user interaction (e.g. will not send messages if the user has muted messages for NodeApi category).
-
-## Database
-
-Add specifics for creating and naming the databases
